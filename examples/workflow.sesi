@@ -1,0 +1,20 @@
+/* Mix deterministic Sesi steps with model-powered workflow steps. */
+allow "../index" in with Sesira
+
+fn normalize_topic(value, _state) {
+  return trim(to_lower(value))
+}
+
+fn package_result(value, state) {
+  return {"topic": state["outputs"]["normalize"]["value"], "brief": value}
+}
+
+let adapter = "gemini" | Sesira.provider({"model": "gemini-3.5-flash-lite"})
+let steps = [
+  Sesira.step("normalize", normalize_topic),
+  Sesira.prompt_step("draft", adapter, "Write a concise product brief about {{input}}.", {"depends_on": ["normalize"], "retries": 1}),
+  Sesira.step("package", package_result, {"depends_on": ["draft"]})
+]
+
+let result = "  AI-powered garden planner  " | Sesira.run_workflow(steps)
+print result["final"]

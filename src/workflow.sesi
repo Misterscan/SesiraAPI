@@ -1,0 +1,147 @@
+/* Dependency-aware workflow orchestration with conditions and retries. */
+allow "utils" in with Utils
+allow "providers" in with Providers
+allow "messages" in with Messages
+allow "observability" in with Observe
+
+export fn step(id: string, handler, options: object = null) -> object {
+  return {
+    "id": id,
+    "kind": "function",
+    "handler": handler,
+    "depends_on": Utils.pick(options, "depends_on", []),
+    "when": Utils.pick(options, "when", null),
+    "retries": Utils.pick(options, "retries", 0),
+    "on_error": Utils.pick(options, "on_error", "stop")
+  }
+}
+
+export fn prompt_step(id: string, adapter: object, prompt_text: string, options: object = null) -> object {
+  return {
+    "id": id,
+    "kind": "prompt",
+    "adapter": adapter,
+    "prompt": prompt_text,
+    "model_options": Utils.pick(options, "model_options", {}),
+    "depends_on": Utils.pick(options, "depends_on", []),
+    "when": Utils.pick(options, "when", null),
+    "retries": Utils.pick(options, "retries", 0),
+    "on_error": Utils.pick(options, "on_error", "stop")
+  }
+}
+
+fn dependencies_ready(item: object, outputs: object) -> bool {
+  for dependency in item["depends_on"] {
+    if !includes(keys(outputs), dependency) { return false }
+  }
+  return true
+}
+
+fn payload_for(item: object, state: object) {
+  let dependencies = item["depends_on"]
+  if len(dependencies) == 0 { return state["input"] }
+  if len(dependencies) == 1 { return state["outputs"][dependencies[0]]["value"] }
+  let values = {}
+  for dependency in dependencies {
+    values[dependency] = state["outputs"][dependency]["value"]
+  }
+  return values
+}
+
+fn execute_step(item: object, state: object) {
+  let payload = payload_for(item, state)
+  if item["kind"] == "function" {
+    return item["handler"](payload, state)
+  }
+  let rendered = Messages.template(item["prompt"], {
+    "input": payload,
+    "initial": state["input"],
+    "outputs": state["outputs"]
+  })
+  return Providers.complete(item["adapter"], rendered, item["model_options"])["text"]
+}
+
+export fn run(steps: array, input, options: object = null) -> object {
+  let step_ids = []
+  for item in steps {
+    let id = str(item["id"])
+    if trim(id) == "" { raise_error("WorkflowError", "Workflow step ID cannot be empty", null) }
+    if includes(step_ids, id) { raise_error("WorkflowError", "Duplicate workflow step ID: " + id, null) }
+    if item["kind"] != "function" && item["kind"] != "prompt" {
+      raise_error("WorkflowError", "Unsupported workflow step kind: " + str(item["kind"]), {"step": id})
+    }
+    if item["kind"] == "function" && type(item["handler"]) != "object" {
+      raise_error("WorkflowError", "Function workflow step requires a handler", {"step": id})
+    }
+    if item["kind"] == "prompt" && trim(str(item["prompt"])) == "" {
+      raise_error("WorkflowError", "Prompt workflow step requires prompt text", {"step": id})
+    }
+    push(step_ids, id)
+  }
+  for item in steps {
+    for dependency in item["depends_on"] {
+      if !includes(step_ids, dependency) {
+        raise_error("WorkflowError", "Missing workflow dependency: " + dependency, {"step": item["id"]})
+      }
+    }
+  }
+  let observer = Utils.pick(options, "observer", Observe.observer({"enabled": false}))
+  let state = {"input": input, "outputs": {}, "order": [], "context": Utils.pick(options, "context", {})}
+  let workflow_span = Observe.start_span(observer, "workflow.run", {"steps": len(steps)})
+  while len(state["order"]) < len(steps) {
+    let progressed = false
+    for item in steps {
+      let id = item["id"]
+      if !includes(keys(state["outputs"]), id) && dependencies_ready(item, state["outputs"]) {
+        progressed = true
+        let allowed = true
+        if item["when"] != null { allowed = item["when"](state) }
+        if !allowed {
+          state["outputs"][id] = {"ok": true, "skipped": true, "value": null, "attempts": 0}
+          push(state["order"], id)
+          Observe.emit(observer, "workflow.step.skipped", {"step": id})
+          continue
+        }
+        let attempts = 0
+        let completed = false
+        let last_error = ""
+        while attempts <= item["retries"] && !completed {
+          attempts = attempts + 1
+          state["context"]["current_step"] = id
+          state["context"]["attempt"] = attempts
+          let span = Observe.start_span(observer, "workflow.step", {"step": id, "attempt": attempts})
+          try {
+            let value = execute_step(item, state)
+            state["outputs"][id] = {"ok": true, "skipped": false, "value": value, "attempts": attempts}
+            Observe.end_span(observer, span, {"ok": true})
+            completed = true
+          } catch (error) {
+            last_error = str(error)
+            Observe.record_error(observer, span, error)
+          }
+        }
+        if !completed {
+          state["outputs"][id] = {"ok": false, "skipped": false, "value": null, "attempts": attempts, "error": last_error}
+          if item["on_error"] != "continue" {
+            Observe.end_span(observer, workflow_span, {"ok": false, "failed_step": id})
+            raise_error("WorkflowError", "Workflow step failed: " + id + ": " + last_error, {"state": state})
+          }
+        }
+        push(state["order"], id)
+      }
+    }
+    if !progressed {
+      Observe.end_span(observer, workflow_span, {"ok": false, "reason": "dependency_cycle"})
+      raise_error("WorkflowError", "Workflow contains a dependency cycle or missing dependency", {"state": state})
+    }
+  }
+  let final_value = input
+  if len(state["order"]) > 0 {
+    let final_id = state["order"][len(state["order"]) - 1]
+    final_value = state["outputs"][final_id]["value"]
+  }
+  state["final"] = final_value
+  state["ok"] = true
+  Observe.end_span(observer, workflow_span, {"ok": true})
+  return state
+}

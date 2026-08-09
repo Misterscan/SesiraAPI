@@ -1,0 +1,115 @@
+/* Runtime JSON-schema subset and structured model output. */
+allow "utils" in with Utils
+allow "providers" in with Providers
+
+fn validate_type(value, expected: string, path: string) -> array {
+  let errors = []
+  let actual = type(value)
+  if expected == "integer" {
+    if actual != "number" || value % 1 != 0 { push(errors, path + " must be an integer") }
+    return errors
+  }
+  if expected == "null" {
+    if value != null { push(errors, path + " must be null") }
+    return errors
+  }
+  if expected == "boolean" {
+    if actual != "bool" { push(errors, path + " must be boolean") }
+    return errors
+  }
+  if actual != expected { push(errors, path + " must be " + expected + ", got " + actual) }
+  return errors
+}
+
+export fn validate(value, schema, path: string = "$") -> object {
+  let errors = []
+  if type(schema) == "string" {
+    errors = validate_type(value, schema, path)
+    return {"valid": len(errors) == 0, "errors": errors}
+  }
+  if type(schema) != "object" {
+    push(errors, path + " has an invalid schema")
+    return {"valid": false, "errors": errors}
+  }
+
+  let expected = schema["type"]
+  if expected != null {
+    let checked = validate_type(value, expected, path)
+    for error in checked { push(errors, error) }
+    if len(errors) > 0 { return {"valid": false, "errors": errors} }
+  }
+
+  let allowed = schema["enum"]
+  if allowed != null && !includes(allowed, value) {
+    push(errors, path + " must be one of " + Utils.safe_json(allowed))
+  }
+
+  if type(value) == "object" {
+    let required = schema["required"]
+    if required == null { required = [] }
+    for key in required {
+      if !includes(keys(value), key) { push(errors, path + "." + key + " is required") }
+    }
+    let properties = schema["properties"]
+    if properties != null {
+      for key in keys(value) {
+        if includes(keys(properties), key) {
+          let child = validate(value[key], properties[key], path + "." + key)
+          for error in child["errors"] { push(errors, error) }
+        } else if schema["additionalProperties"] == false {
+          push(errors, path + "." + key + " is not allowed")
+        }
+      }
+    }
+  }
+
+  if type(value) == "array" && schema["items"] != null {
+    let index = 0
+    for item in value {
+      let child = validate(item, schema["items"], path + "[" + str(index) + "]")
+      for error in child["errors"] { push(errors, error) }
+      index = index + 1
+    }
+  }
+
+  if type(value) == "string" {
+    if schema["minLength"] != null && len(value) < schema["minLength"] { push(errors, path + " is too short") }
+    if schema["maxLength"] != null && len(value) > schema["maxLength"] { push(errors, path + " is too long") }
+    if schema["pattern"] != null && !regex(schema["pattern"], value, {"mode": "test"}) {
+      push(errors, path + " does not match the required pattern")
+    }
+  }
+
+  if type(value) == "number" {
+    if schema["minimum"] != null && value < schema["minimum"] { push(errors, path + " is below minimum") }
+    if schema["maximum"] != null && value > schema["maximum"] { push(errors, path + " is above maximum") }
+  }
+  return {"valid": len(errors) == 0, "errors": errors}
+}
+
+export fn parse(text: string, schema) {
+  let value = null
+  try {
+    value = from_json(Utils.clean_json_text(text))
+  } catch (error) {
+    raise_error("StructuredOutputError", "Model output is not valid JSON", {"response": text})
+  }
+  let checked = validate(value, schema)
+  if !checked["valid"] {
+    raise_error("StructuredOutputError", "Model output did not match the schema", checked)
+  }
+  return value
+}
+
+export fn generate(adapter: object, prompt_text: string, schema, options: object = null) {
+  let schema_text = Utils.safe_json(schema)
+  let request = prompt_text + "\n\nReturn only valid JSON. It must match this JSON Schema exactly:\n" + schema_text
+  let response = Providers.complete(adapter, request, options)
+  try {
+    return parse(response["text"], schema)
+  } catch (first_error) {
+    let repair = "Repair this response into valid JSON matching the schema. Return JSON only.\nSchema: " + schema_text + "\nResponse: " + response["text"]
+    let repaired = Providers.complete(adapter, repair, {"temperature": 0, "stream": false})
+    return parse(repaired["text"], schema)
+  }
+}

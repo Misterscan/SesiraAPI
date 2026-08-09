@@ -1,0 +1,26 @@
+/* Autonomous agent with validated native Sesi tools. */
+allow "../index" in with Sesira
+
+fn calculate(args, _context) {
+  let left = args["left"]
+  let right = args["right"]
+  if args["operation"] == "add" { return left + right }
+  if args["operation"] == "multiply" { return left * right }
+  raise_error("ToolError", "Unsupported operation", args)
+}
+
+let calculator = Sesira.tool("calculator", "Add or multiply two numbers", {
+  "type": "object",
+  "properties": {
+    "left": {"type": "number"},
+    "right": {"type": "number"},
+    "operation": {"type": "string", "enum": ["add", "multiply"]}
+  },
+  "required": ["left", "right", "operation"],
+  "additionalProperties": false
+}, calculate)
+
+let app = {"provider": "gemini", "model": "gemini-3.5-flash-lite"} | Sesira.create
+let agent = Sesira.create_agent(app, {"name": "math-agent", "tools": [calculator], "max_steps": 5})
+let result = "Multiply 17 by 23, then explain the result briefly." | Sesira.run_agent(agent)
+print result["answer"]

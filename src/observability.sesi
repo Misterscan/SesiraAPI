@@ -1,0 +1,95 @@
+/* Lightweight traces, events, JSONL logging, and aggregate metrics. */
+allow "utils" in with Utils
+
+fn ensure_log_parent(path: string) {
+  if !contains(path, "/") { return }
+  let parts = split(path, "/")
+  let parent = join(slice(parts, 0, len(parts) - 1), "/")
+  if parent != "" { try { make_dir(parent) } catch (error) {} }
+}
+
+export fn observer(options: object = null) -> object {
+  let path = Utils.pick(options, "path", "")
+  if path != "" && Utils.pick(options, "enabled", true) == true { ensure_log_parent(path) }
+  return {
+    "enabled": Utils.pick(options, "enabled", true),
+    "path": path,
+    "trace_id": Utils.pick(options, "trace_id", Utils.make_id("trace")),
+    "events": []
+  }
+}
+
+export fn emit(target: object, name: string, attributes: object = null) -> object {
+  if attributes == null { attributes = {} }
+  let event = {
+    "name": name,
+    "timestamp": time(),
+    "trace_id": target["trace_id"],
+    "attributes": attributes
+  }
+  if target["enabled"] != true { return event }
+  push(target["events"], event)
+  if target["path"] != null && target["path"] != "" {
+    // Telemetry is best-effort and must never change application behavior.
+    try { append_file(target["path"], to_json(event) + "\n") } catch (log_error) {}
+  }
+  return event
+}
+
+export fn start_span(target: object, name: string, attributes: object = null) -> object {
+  if attributes == null { attributes = {} }
+  let span = {
+    "id": Utils.make_id("span"),
+    "name": name,
+    "started_at": time(),
+    "attributes": attributes
+  }
+  emit(target, "span.start", {
+    "span_id": span["id"],
+    "span_name": name,
+    "attributes": attributes
+  })
+  return span
+}
+
+export fn end_span(target: object, span: object, attributes: object = null) -> object {
+  if attributes == null { attributes = {} }
+  let duration = time() - span["started_at"]
+  let data = {
+    "span_id": span["id"],
+    "span_name": span["name"],
+    "duration_ms": duration,
+    "attributes": attributes
+  }
+  emit(target, "span.end", data)
+  return data
+}
+
+export fn record_error(target: object, span: object, error) -> object {
+  return emit(target, "span.error", {
+    "span_id": span["id"],
+    "span_name": span["name"],
+    "error": str(error),
+    "error_type": "RuntimeError"
+  })
+}
+
+export fn metrics(target: object) -> object {
+  let counts = {}
+  let errors = 0
+  let duration = 0
+  for event in target["events"] {
+    let name = event["name"]
+    if counts[name] == null { counts[name] = 0 }
+    counts[name] = counts[name] + 1
+    if name == "span.error" { errors = errors + 1 }
+    if name == "span.end" { duration = duration + event["attributes"]["duration_ms"] }
+  }
+  return {
+    "trace_id": target["trace_id"],
+    "events": len(target["events"]),
+    "errors": errors,
+    "duration_ms": duration,
+    "counts": counts
+  }
+}

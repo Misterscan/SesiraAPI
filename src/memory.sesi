@@ -1,0 +1,152 @@
+/* In-process short-term memory and persistent std/db long-term memory. */
+allow "std/db" in with {db_open}
+allow "utils" in with Utils
+allow "retrieval" in with Retrieval
+
+fn ensure_parent(path: string) {
+  if !contains(path, "/") { return }
+  let parts = split(path, "/")
+  if len(parts) <= 1 { return }
+  let parent = join(slice(parts, 0, len(parts) - 1), "/")
+  if parent == "" { return }
+  try { make_dir(parent) } catch (error) {}
+}
+
+fn collection_name(namespace: string) -> string {
+  let clean = regex("[^a-zA-Z0-9_-]+", namespace, {
+    "mode": "replace",
+    "flags": "g",
+    "replacement": "_"
+  })
+  return "memory_" + clean
+}
+
+export fn short(options: object = null) -> object {
+  return {
+    "kind": "short",
+    "messages": [],
+    "limit": Utils.pick(options, "limit", 20)
+  }
+}
+
+export fn add_short(store: object, item) -> object {
+  push(store["messages"], item)
+  let limit = store["limit"]
+  if len(store["messages"]) > limit {
+    store["messages"] = slice(store["messages"], len(store["messages"]) - limit)
+  }
+  return item
+}
+
+export fn recent(store: object, limit: number = 0) -> array {
+  let messages = store["messages"]
+  if limit <= 0 || len(messages) <= limit { return messages }
+  return slice(messages, len(messages) - limit)
+}
+
+export fn clear_short(store: object) -> bool {
+  store["messages"] = []
+  return true
+}
+
+export fn long(path: string, namespace: string = "default", password = null) -> object {
+  ensure_parent(path)
+  let database = null
+  if password == null || password == "" {
+    database = db_open(path)
+  } else {
+    database = db_open(path, password)
+  }
+  let records = database.collection(collection_name(namespace))
+  return {
+    "kind": "long",
+    "path": path,
+    "namespace": namespace,
+    "database": database,
+    "records": records
+  }
+}
+
+export fn remember(store: object, content: string, metadata: object = null, id: string = "") -> object {
+  if metadata == null { metadata = {} }
+  if id == "" { id = Utils.make_id("memory") }
+  let now_ms = time()
+  let record = {
+    "id": id,
+    "content": content,
+    "metadata": metadata,
+    "created_at": now_ms,
+    "updated_at": now_ms
+  }
+  let existing = store["records"].find({"id": id})
+  if len(existing) > 0 {
+    record["created_at"] = existing[0]["created_at"]
+    store["records"].update({"id": id}, record)
+  } else {
+    store["records"].insert(record)
+  }
+  return record
+}
+
+export fn get(store: object, id: string) {
+  let found = store["records"].find({"id": id})
+  if len(found) == 0 { return null }
+  return found[0]
+}
+
+export fn all(store: object, limit: number = 0) -> array {
+  let records = store["records"].find({})
+  if limit > 0 && len(records) > limit { return slice(records, 0, limit) }
+  return records
+}
+
+export fn recall(store: object, query: string, options: object = null) -> array {
+  return Retrieval.search(all(store), query, options)
+}
+
+export fn forget(store: object, id: string) -> bool {
+  return store["records"].delete({"id": id}) > 0
+}
+
+export fn clear_long(store: object) -> number {
+  return store["records"].delete({})
+}
+
+export fn bank(options: object = null) -> object {
+  let path = Utils.pick(options, "path", ".sesira/memory.db")
+  let namespace = Utils.pick(options, "namespace", "default")
+  let password = Utils.pick(options, "password", null)
+
+  namespace = namespace
+  password = password
+  return {
+    "short": short({"limit": Utils.pick(options, "short_limit", 20)}),
+    "long": long(path, namespace, password)
+  }
+}
+
+export fn add_turn(bank_store: object, role: string, content: string, metadata: object = null) -> object {
+  if metadata == null { metadata = {} }
+  let item = {
+    "role": role,
+    "content": content,
+    "metadata": metadata,
+    "timestamp": time()
+  }
+  add_short(bank_store["short"], item)
+  remember(bank_store["long"], role + ": " + content, {
+    "kind": "conversation",
+    "role": role,
+    "metadata": metadata
+  })
+  return item
+}
+
+export fn retrieve(bank_store: object, query: string, options: object = null) -> object {
+  let matches = recall(bank_store["long"], query, options)
+  return {
+    "recent": recent(bank_store["short"]),
+    "relevant": matches,
+    "context": Retrieval.context(matches)
+  }
+}

@@ -1,0 +1,81 @@
+/* Internal, dependency-free utility helpers. */
+
+export fn copy_object(source: object) -> object {
+  let result = {}
+  if source == null { return result }
+  for key in keys(source) {
+    result[key] = source[key]
+  }
+  return result
+}
+
+export fn merge(base: object, overrides: object) -> object {
+  let result = copy_object(base)
+  if overrides == null { return result }
+  for key in keys(overrides) {
+    if overrides[key] != null {
+      result[key] = overrides[key]
+    }
+  }
+  return result
+}
+
+export fn make_id(prefix: string = "id") -> string {
+  let random_part = str(random())
+  random_part = swap(random_part, "0.", "")
+  return prefix + "_" + str(time()) + "_" + random_part
+}
+
+export fn clamp(value: number, low: number, high: number) -> number {
+  if value < low { return low }
+  if value > high { return high }
+  return value
+}
+
+export fn safe_json(value) -> string {
+  try {
+    return to_json(value)
+  } catch (error) {
+    return str(value)
+  }
+}
+
+export fn as_array(value) -> array {
+  if value == null { return [] }
+  if type(value) == "array" { return value }
+  return [value]
+}
+
+export fn contains_key(value, key: string) -> bool {
+  if type(value) != "object" { return false }
+  return includes(keys(value), key)
+}
+
+export fn pick(value: object, key: string, fallback) {
+  if value != null && contains_key(value, key) && value[key] != null {
+    return value[key]
+  }
+  return fallback
+}
+
+export fn clean_json_text(text: string) -> string {
+  let cleaned = trim(text)
+  cleaned = swap(cleaned, "```json", "")
+  cleaned = swap(cleaned, "```JSON", "")
+  cleaned = swap(cleaned, "```", "")
+  return trim(cleaned)
+}
+
+export fn serialize_error(error) -> object {
+  return {
+    "name": "RuntimeError",
+    "message": str(error)
+  }
+}
+
+export fn assert_non_empty(value: string, label: string) -> string {
+  if value == null || trim(value) == "" {
+    raise_error("ValidationError", label + " cannot be empty", {"field": label})
+  }
+  return value
+}

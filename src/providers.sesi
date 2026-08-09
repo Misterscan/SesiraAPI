@@ -1,0 +1,74 @@
+/* Native Sesi provider adapters over model(). */
+allow "utils" in with Utils
+
+export fn provider(kind: string, options: object = null) -> object {
+  let normalized = to_lower(trim(kind))
+  let base = {
+    "name": normalized,
+    "model": "",
+    "system": "",
+    "temperature": 0.2,
+    "max_tokens": 4096,
+    "thinking": "low",
+    "search": false,
+    "cache": true,
+    "stream": false,
+    "images": [],
+    "tools": []
+  }
+  if normalized == "gemini" { base["model"] = "gemini-3.6-flash" }
+  if normalized == "openai" || normalized == "gpt" { base["model"] = "gpt-5.6-luna" }
+  if normalized == "local" { base["model"] = "local" }
+  if normalized == "sesi" { base["model"] = "agent" }
+  if normalized == "custom" { base["model"] = Utils.pick(options, "model", null) }
+  if base["model"] == "" || base["model"] == null {
+    raise_error("ConfigurationError", "Unsupported provider adapter: " + kind, {
+      "supported": ["gemini", "openai", "local", "sesi", "custom"]
+    })
+  }
+  let result = Utils.merge(base, options)
+  result["name"] = normalized
+  return result
+}
+
+export fn from_config(config: object) -> object {
+  return provider(str(config["provider"]), config)
+}
+
+export fn complete(adapter: object, prompt_text: string, options: object = null) -> object {
+  let settings = Utils.merge(adapter, options)
+  let started = time()
+  let sesiRef = ""; try { sesiRef = read_file("SesiraAPI/docs/ref/BUILTINS.md") } catch (e) {print "Warning: Could not read SesiraAPI/docs/ref/BUILTINS.md for reference."}
+  let sys = "SESI LANGUAGE REFERENCES:\n" + sesiRef + "\n" + settings["system"]
+  let text = ""
+  if settings["name"] == "openai" || settings["name"] == "gpt" {
+    text = model(settings["model"]) {max_tokens: settings["max_tokens"], thinkingLevel: settings["thinking"], system: sys, search: settings["search"], cache: settings["cache"], stream: settings["stream"], images: settings["images"], tools: settings["tools"]} {prompt_text}
+  } else {
+    text = model(settings["model"]) {temperature: settings["temperature"], max_tokens: settings["max_tokens"], thinkingLevel: settings["thinking"], system: sys, search: settings["search"], cache: settings["cache"], stream: settings["stream"], images: settings["images"], tools: settings["tools"]} {prompt_text}
+  }
+  let usage = model_usage()
+  return {
+    "id": Utils.make_id("completion"),
+    "provider": settings["name"],
+    "model": settings["model"],
+    "text": text,
+    "usage": usage,
+    "duration_ms": time() - started
+  }
+}
+
+export fn stream(adapter: object, prompt_text: string, on_chunk, options: object = null) -> object {
+  let stream_options = Utils.copy_object(options)
+  stream_options["stream"] = on_chunk
+  return complete(adapter, prompt_text, stream_options)
+}
+
+export fn supported() -> array {
+  return [
+    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.6-flash"},
+    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-5.6-luna"},
+    {"name": "local", "key_env": null, "default_model": "local"},
+    {"name": "sesi", "key_env": null, "default_model": "agent"},
+    {"name": "custom", "key_env": "provider-specific", "default_model": null}
+  ]
+}

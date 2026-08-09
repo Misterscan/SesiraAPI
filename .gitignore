@@ -1,0 +1,5 @@
+.sesira/
+tests/*.db
+*.log
+sesi_modules
+.env

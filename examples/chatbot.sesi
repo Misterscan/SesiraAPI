@@ -1,0 +1,15 @@
+/* Persistent chatbot with the pipe-first SesiraAPI. */
+allow "../index" in with Sesira
+
+let app = {
+  "name": "support-bot",
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "system": "You are a concise, friendly support assistant.",
+  "memory_path": ".sesira/support-memory.db",
+  "memory_namespace": "support"
+} | Sesira.create
+
+let response = "How do I reset my password?" | Sesira.chat(app)
+print response["text"]
+print "Tokens:" response["usage"]["total_tokens"]

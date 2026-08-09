@@ -1,0 +1,100 @@
+/* Configuration from defaults, JSON files, environment, and explicit overrides. */
+allow "utils" in with Utils
+
+export fn defaults() -> object {
+  return {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash",
+    "system": "You are a helpful Sesi assistant.",
+    "temperature": 0.2,
+    "max_tokens": 4096,
+    "thinking": "low",
+    "search": false,
+    "cache": true,
+    "stream": false,
+    "short_memory_limit": 20,
+    "memory_path": ".sesira/memory.db",
+    "memory_namespace": "default",
+    "retrieval_limit": 5,
+    "max_agent_steps": 8,
+    "log_path": ".sesira/events.jsonl",
+    "observability": true
+  }
+}
+
+export fn from_env() -> object {
+  let result = {}
+  let provider = env("SESIRA_PROVIDER")
+  let model_name = env("SESIRA_MODEL")
+  let memory_path = env("SESIRA_MEMORY_PATH")
+  let namespace = env("SESIRA_MEMORY_NAMESPACE")
+  let log_path = env("SESIRA_LOG_PATH")
+  let temperature = env("SESIRA_TEMPERATURE")
+  let max_tokens = env("SESIRA_MAX_TOKENS")
+  if provider != null { result["provider"] = provider }
+  if model_name != null { result["model"] = model_name }
+  if memory_path != null { result["memory_path"] = memory_path }
+  if namespace != null { result["memory_namespace"] = namespace }
+  if log_path != null { result["log_path"] = log_path }
+  if temperature != null { result["temperature"] = num(temperature) }
+  if max_tokens != null { result["max_tokens"] = num(max_tokens) }
+  return result
+}
+
+export fn read(path: string = "sesira.json") -> object {
+  let content = null
+  try {
+    content = read_file(path)
+  } catch (error) {
+    let message = str(error)
+    if contains(message, "ENOENT") || contains(to_lower(message), "not found") { return {} }
+    raise_error("ConfigurationError", "Unable to read configuration: " + message, {"path": path})
+  }
+  if content == null || trim(content) == "" { return {} }
+  let parsed = null
+  try {
+    parsed = from_json(content)
+  } catch (error) {
+    raise_error("ConfigurationError", "Configuration is not valid JSON: " + str(error), {"path": path})
+  }
+  if type(parsed) != "object" {
+    raise_error("ConfigurationError", "Configuration root must be an object", {"path": path})
+  }
+  return parsed
+}
+
+export fn load(path: string = "sesira.json", overrides: object = null) -> object {
+  let config = defaults()
+  config = Utils.merge(config, read(path))
+  config = Utils.merge(config, from_env())
+  config = Utils.merge(config, overrides)
+  return validate(config)
+}
+
+export fn validate(config: object) -> object {
+  if config["provider"] == null || trim(str(config["provider"])) == "" {
+    raise_error("ConfigurationError", "provider is required", null)
+  }
+  if config["model"] == null || trim(str(config["model"])) == "" {
+    raise_error("ConfigurationError", "model is required", null)
+  }
+  if config["temperature"] < 0 || config["temperature"] > 2 {
+    raise_error("ConfigurationError", "temperature must be between 0 and 2", null)
+  }
+  if config["max_tokens"] <= 0 {
+    raise_error("ConfigurationError", "max_tokens must be positive", null)
+  }
+  return config
+}
+
+export fn redact(config: object) -> object {
+  let result = Utils.copy_object(config)
+  let secrets = ["api_key", "token", "password", "secret"]
+  for key in keys(result) {
+    let lower = to_lower(key)
+    for secret in secrets {
+      if contains(lower, secret) { result[key] = "[redacted]" }
+    }
+  }
+  return result
+}

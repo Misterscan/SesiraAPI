@@ -1,0 +1,135 @@
+/* Unified messages and prompt templates. */
+allow "utils" in with Utils
+
+export fn message(role: string, content, metadata: object = null) -> object {
+  if metadata == null { metadata = {} }
+  let allowed = ["system", "user", "assistant", "tool"]
+  if !includes(allowed, role) {
+    raise_error("ValidationError", "Invalid message role: " + role, {"allowed": allowed})
+  }
+  if type(content) != "string" && type(content) != "array" {
+    raise_error("ValidationError", "Message content must be a string or content-parts array", null)
+  }
+  return {
+    "role": role,
+    "content": content,
+    "metadata": metadata
+  }
+}
+
+export fn system(content: string) -> object {
+  return message("system", content)
+}
+
+export fn user(content) -> object {
+  return message("user", content)
+}
+
+export fn assistant(content) -> object {
+  return message("assistant", content)
+}
+
+export fn tool_result(name: string, content, call_id: string = "") -> object {
+  let result = message("tool", content, {"tool": name})
+  result["name"] = name
+  result["call_id"] = call_id
+  return result
+}
+
+export fn text_part(text: string) -> object {
+  return {"type": "text", "text": text}
+}
+
+export fn image_part(path: string) -> object {
+  return {"type": "image", "path": path}
+}
+
+export fn audio_part(path: string) -> object {
+  return {"type": "audio", "path": path}
+}
+
+export fn content_text(content) -> string {
+  if type(content) == "string" { return content }
+  if type(content) != "array" { return str(content) }
+  let text = ""
+  for part in content {
+    if type(part) == "object" && part["type"] == "text" {
+      text = text + part["text"]
+    }
+    if type(part) == "object" && part["type"] == "image" {
+      text = text + "[Image: " + str(part["path"]) + "]"
+    }
+    if type(part) == "object" && part["type"] == "audio" {
+      text = text + "[Audio: " + str(part["path"]) + "]"
+    }
+  }
+  return text
+}
+
+export fn normalize(input) -> array {
+  if type(input) == "string" { return [user(input)] }
+  if type(input) == "object" {
+    let checked = message(str(input["role"]), input["content"], input["metadata"])
+    for key in keys(input) { checked[key] = input[key] }
+    return [checked]
+  }
+  if type(input) == "array" {
+    let checked_items = []
+    for item in input {
+      if type(item) != "object" {
+        raise_error("ValidationError", "Every message array item must be an object", null)
+      }
+      push(checked_items, normalize(item)[0])
+    }
+    return checked_items
+  }
+  raise_error("ValidationError", "Chat input must be text, a message, or a message array", null)
+  return []
+}
+
+export fn render(messages) -> string {
+  let result = ""
+  for item in normalize(messages) {
+    let role = to_upper(str(item["role"]))
+    result = result + role + ": " + content_text(item["content"]) + "\n"
+  }
+  return result
+}
+
+export fn system_text(messages) -> string {
+  let result = ""
+  for item in normalize(messages) {
+    if item["role"] == "system" {
+      if result != "" { result = result + "\n\n" }
+      result = result + content_text(item["content"])
+    }
+  }
+  return result
+}
+
+export fn without_system(messages) -> array {
+  let result = []
+  for item in normalize(messages) {
+    if item["role"] != "system" { push(result, item) }
+  }
+  return result
+}
+
+export fn template(text: string, values: object) -> string {
+  let result = text
+  for key in keys(values) {
+    let replacement = values[key]
+    if type(replacement) != "string" { replacement = Utils.safe_json(replacement) }
+    result = swap(result, "{{" + key + "}}", replacement)
+    result = swap(result, "{{ " + key + " }}", replacement)
+  }
+  let unresolved = regex("\\{\\{\\s*[a-zA-Z0-9_.-]+\\s*\\}\\}", result)
+  if len(unresolved) > 0 {
+    raise_error("PromptError", "Prompt template contains unresolved values", {"matches": unresolved})
+  }
+  return result
+}
+
+export fn estimate(messages, model_name: string = "gemini-3.6-flash") -> number {
+  return estimate_tokens(render(messages), model_name)
+}

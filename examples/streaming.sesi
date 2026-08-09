@@ -1,0 +1,17 @@
+/* Stream chunks while retaining the complete response and usage. */
+allow "../index" in with Sesira
+
+fn on_chunk(chunk) {
+  print chunk
+}
+
+let app = {
+  "provider": "openai",
+  "model": "gpt-5.6-terra",
+  "memory": false,
+  "observability": false
+} | Sesira.create
+
+let result = "Explain Sesi pipes in three sentences." | Sesira.stream(app, on_chunk)
+print ""
+print "Completed with model:" result["model"]

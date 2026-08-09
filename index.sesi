@@ -1,0 +1,81 @@
+/*
+  SesiraAPI public entry point.
+  Import with: allow "SesiraAPI" in with Sesira
+*/
+allow "src/core" in with Core
+allow "src/providers" in with Providers
+allow "src/messages" in with Messages
+allow "src/schema" in with Schema
+allow "src/tools" in with Tools
+allow "src/agents" in with Agents
+allow "src/memory" in with Memory
+allow "src/retrieval" in with Retrieval
+allow "src/workflow" in with Workflow
+allow "src/observability" in with Observe
+allow "src/config" in with Config
+
+// Application and inference
+export fn create(config: object = null) -> object { return Core.create(config) }
+export fn provider(kind: string, options: object = null) -> object { return Providers.provider(kind, options) }
+export fn complete(prompt_text: string, adapter: object, options: object = null) -> object { return Providers.complete(adapter, prompt_text, options) }
+export fn chat(input, app: object, options: object = null) -> object { return Core.chat(app, input, options) }
+export fn ask(input, app: object, options: object = null) -> string { return Core.ask(app, input, options) }
+export fn stream(input, app: object, on_chunk, options: object = null) -> object { return Core.stream(app, input, on_chunk, options) }
+export fn structured(prompt_text: string, app: object, schema, options: object = null) { return Core.structured(app, prompt_text, schema, options) }
+
+// Messages and prompts
+export fn message(role: string, content, metadata: object = null) -> object { return Messages.message(role, content, metadata) }
+export fn system(content: string) -> object { return Messages.system(content) }
+export fn user(content) -> object { return Messages.user(content) }
+export fn assistant(content) -> object { return Messages.assistant(content) }
+export fn tool_result(name: string, content, call_id: string = "") -> object { return Messages.tool_result(name, content, call_id) }
+export fn text_part(text: string) -> object { return Messages.text_part(text) }
+export fn image_part(path: string) -> object { return Messages.image_part(path) }
+export fn audio_part(path: string) -> object { return Messages.audio_part(path) }
+export fn render_prompt(text: string, values: object) -> string { return Messages.template(text, values) }
+export fn render_messages(messages) -> string { return Messages.render(messages) }
+export fn message_text(content) -> string { return Messages.content_text(content) }
+
+// Tools and agents
+export fn tool(name: string, description: string, parameters, handler) -> object { return Tools.define(name, description, parameters, handler) }
+export fn execute_tool(call: object, tools: array, context: object = null) -> object { return Tools.execute(tools, call, context) }
+export fn tool_schemas(tools: array, provider_name: string = "gemini") -> array { return Tools.schemas(tools, provider_name) }
+export fn register_tools(tools: array) -> array { return Tools.register_native(tools) }
+export fn create_agent(app: object, options: object = null) -> object { return Agents.create(app, options) }
+export fn run_agent(task: string, agent: object, options: object = null) -> object { return Agents.run(agent, task, options) }
+
+// Memory and retrieval
+export fn short_memory(options: object = null) -> object { return Memory.short(options) }
+export fn long_memory(path: string, namespace: string = "default", password = null) -> object { return Memory.long(path, namespace, password) }
+export fn memory_bank(options: object = null) -> object { return Memory.bank(options) }
+export fn add_short(item, store: object) -> object { return Memory.add_short(store, item) }
+export fn recent_memory(store: object, limit: number = 0) -> array { return Memory.recent(store, limit) }
+export fn clear_short_memory(store: object) -> bool { return Memory.clear_short(store) }
+export fn remember(content: string, store: object, metadata: object = null, id: string = "") -> object { return Memory.remember(store, content, metadata, id) }
+export fn recall(query: string, store: object, options: object = null) -> array { return Memory.recall(store, query, options) }
+export fn get_memory(id: string, store: object) { return Memory.get(store, id) }
+export fn list_memory(store: object, limit: number = 0) -> array { return Memory.all(store, limit) }
+export fn forget(id: string, store: object) -> bool { return Memory.forget(store, id) }
+export fn clear_long_memory(store: object) -> number { return Memory.clear_long(store) }
+export fn retrieve(query: string, app: object, options: object = null) -> object { return Core.retrieve(app, query, options) }
+export fn document(content: string, metadata: object = null, id: string = "") -> object { return Retrieval.document(content, metadata, id) }
+export fn chunk(document, options: object = null) -> array { return Retrieval.chunk(document, options) }
+export fn search(documents: array, query: string, options: object = null) -> array { return Retrieval.search(documents, query, options) }
+export fn context(results: array, options: object = null) -> string { return Retrieval.context(results, options) }
+export fn index_documents(documents: array, app: object, options: object = null) -> number { return Core.index_documents(app, documents, options) }
+
+// Workflows and observability
+export fn step(id: string, handler, options: object = null) -> object { return Workflow.step(id, handler, options) }
+export fn prompt_step(id: string, adapter: object, prompt_text: string, options: object = null) -> object { return Workflow.prompt_step(id, adapter, prompt_text, options) }
+export fn run_workflow(input, steps: array, options: object = null) -> object { return Workflow.run(steps, input, options) }
+export fn observer(options: object = null) -> object { return Observe.observer(options) }
+export fn emit(observer: object, name: string, attributes: object = null) -> object { return Observe.emit(observer, name, attributes) }
+export fn start_span(observer: object, name: string, attributes: object = null) -> object { return Observe.start_span(observer, name, attributes) }
+export fn end_span(observer: object, span: object, attributes: object = null) -> object { return Observe.end_span(observer, span, attributes) }
+export fn metrics(observer: object) -> object { return Observe.metrics(observer) }
+
+// Configuration and discovery
+export fn load_config(path: string = "sesira.json", overrides: object = null) -> object { return Config.load(path, overrides) }
+export fn redact_config(config: object) -> object { return Config.redact(config) }
+export fn supported_providers() -> array { return Providers.supported() }
+export fn validate(value, schema) -> object { return Schema.validate(value, schema) }

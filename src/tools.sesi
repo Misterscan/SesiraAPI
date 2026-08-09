@@ -1,0 +1,84 @@
+/* Tool definitions, validation, discovery, and safe execution. */
+allow "utils" in with Utils
+allow "schema" in with Schema
+
+export fn define(name: string, description: string, parameters, handler) -> object {
+  Utils.assert_non_empty(name, "tool name")
+  // Sesi exposes function values through the general object runtime type.
+  if type(handler) != "object" {
+    raise_error("ValidationError", "Tool handler must be a function", {"tool": name})
+  }
+  return {
+    "name": name,
+    "description": description,
+    "parameters": parameters,
+    "handler": handler
+  }
+}
+
+export fn schemas(tools: array, provider_name: string = "gemini") -> array {
+  let declarations = []
+  for item in tools {
+    push(declarations, {
+      "name": item["name"],
+      "description": item["description"],
+      "parameters": item["parameters"]
+    })
+  }
+  if provider_name == "gemini" {
+    return [{"functionDeclarations": declarations}]
+  }
+  let result = []
+  for item in declarations {
+    push(result, {"type": "function", "function": item})
+  }
+  return result
+}
+
+export fn describe(tools: array) -> string {
+  let output = ""
+  for item in tools {
+    output = output + "- " + item["name"] + ": " + item["description"] + "\n  arguments: " + Utils.safe_json(item["parameters"]) + "\n"
+  }
+  return trim(output)
+}
+
+export fn find_tool(tools: array, name: string) {
+  for item in tools {
+    if item["name"] == name { return item }
+  }
+  return null
+}
+
+export fn execute(tools: array, call: object, context: object = null) -> object {
+  if context == null { context = {} }
+  let name = call["name"]
+  let args = call["args"]
+  if args == null { args = call["arguments"] }
+  if args == null { args = {} }
+  let selected = find_tool(tools, name)
+  if selected == null {
+    return {"ok": false, "tool": name, "error": "Tool is not registered", "result": null}
+  }
+  let checked = Schema.validate(args, selected["parameters"])
+  if !checked["valid"] {
+    return {"ok": false, "tool": name, "error": "Invalid tool arguments", "issues": checked["errors"], "result": null}
+  }
+  let started = time()
+  try {
+    let result = selected["handler"](args, context)
+    return {"ok": true, "tool": name, "result": result, "duration_ms": time() - started}
+  } catch (error) {
+    return {"ok": false, "tool": name, "error": str(error), "result": null, "duration_ms": time() - started}
+  }
+}
+
+export fn register_native(tools: array) -> array {
+  let registered = []
+  for item in tools {
+    if define_tool(item["name"], item["handler"], item["description"]) {
+      push(registered, item["name"])
+    }
+  }
+  return registered
+}

@@ -1,0 +1,158 @@
+/* Sesira application runtime: chat, streaming, memory, retrieval, and traces. */
+allow "utils" in with Utils
+allow "config" in with Config
+allow "providers" in with Providers
+allow "messages" in with Messages
+allow "memory" in with Memory
+allow "retrieval" in with Retrieval
+allow "schema" in with Schema
+allow "observability" in with Observe
+
+export fn create(overrides: object = null) -> object {
+  let path = Utils.pick(overrides, "config_path", "sesira.json")
+  let config = Config.load(path, overrides)
+  let adapter = Providers.from_config(config)
+  let memory_store = null
+  if Utils.pick(config, "memory", true) == true {
+    memory_store = Memory.bank({
+      "path": config["memory_path"],
+      "namespace": config["memory_namespace"],
+      "password": config["memory_password"],
+      "short_limit": config["short_memory_limit"]
+    })
+  }
+  let observer = Observe.observer({
+    "enabled": config["observability"],
+    "path": config["log_path"]
+  })
+  let app = {
+    "name": Utils.pick(config, "name", "sesira-app"),
+    "config": config,
+    "provider": adapter,
+    "memory": memory_store,
+    "observer": observer
+  }
+  Observe.emit(observer, "app.created", {
+    "name": app["name"],
+    "provider": adapter["name"],
+    "model": adapter["model"]
+  })
+  return app
+}
+
+fn last_user_text(messages: array) -> string {
+  let result = ""
+  for item in messages {
+    if item["role"] == "user" { result = Messages.content_text(item["content"]) }
+  }
+  return result
+}
+
+fn recent_prompt(memory_store) -> string {
+  if memory_store == null { return "" }
+  let output = ""
+  for item in Memory.recent(memory_store["short"]) {
+    output = output + to_upper(item["role"]) + ": " + item["content"] + "\n"
+  }
+  return output
+}
+
+fn image_paths(messages: array) -> array {
+  let paths = []
+  for item in messages {
+    if type(item["content"]) == "array" {
+      for part in item["content"] {
+        if type(part) == "object" && part["type"] == "image" { push(paths, part["path"]) }
+      }
+    }
+  }
+  return paths
+}
+
+export fn chat(app: object, input, options: object = null) -> object {
+  let messages = Messages.normalize(input)
+  let question = last_user_text(messages)
+  let span = Observe.start_span(app["observer"], "chat", {"message_count": len(messages)})
+  let system_text = Messages.system_text(messages)
+  if system_text == "" { system_text = app["provider"]["system"] }
+  let retrieved = {"context": "", "relevant": [], "recent": []}
+  if app["memory"] != null && question != "" {
+    retrieved = Memory.retrieve(app["memory"], question, {
+      "limit": Utils.pick(options, "retrieval_limit", app["config"]["retrieval_limit"]),
+      "min_score": Utils.pick(options, "min_score", 0.05)
+    })
+    if retrieved["context"] != "" {
+      system_text = system_text + "\n\nRelevant memory (use only when helpful):\n" + retrieved["context"]
+    }
+  }
+  let prompt_text = recent_prompt(app["memory"]) + Messages.render(Messages.without_system(messages)) + "ASSISTANT:"
+  let call_options = Utils.copy_object(options)
+  call_options["system"] = system_text
+  let images = image_paths(messages)
+  if len(images) > 0 { call_options["images"] = images }
+  try {
+    let response = Providers.complete(app["provider"], prompt_text, call_options)
+    response["retrieval"] = retrieved["relevant"]
+    if app["memory"] != null {
+      if question != "" { Memory.add_turn(app["memory"], "user", question) }
+      Memory.add_turn(app["memory"], "assistant", response["text"], {
+        "model": response["model"],
+        "completion_id": response["id"]
+      })
+    }
+    Observe.end_span(app["observer"], span, {
+      "model": response["model"],
+      "duration_ms": response["duration_ms"],
+      "usage": response["usage"]
+    })
+    return response
+  } catch (error) {
+    Observe.record_error(app["observer"], span, error)
+    raise_error("ProviderError", str(error), {"provider": app["provider"]["name"]})
+  }
+  return null
+}
+
+export fn ask(app: object, input, options: object = null) -> string {
+  return chat(app, input, options)["text"]
+}
+
+export fn stream(app: object, input, on_chunk, options: object = null) -> object {
+  let stream_options = Utils.copy_object(options)
+  stream_options["stream"] = on_chunk
+  return chat(app, input, stream_options)
+}
+
+export fn structured(app: object, prompt_text: string, schema, options: object = null) {
+  let span = Observe.start_span(app["observer"], "structured.generate", {})
+  try {
+    let result = Schema.generate(app["provider"], prompt_text, schema, options)
+    Observe.end_span(app["observer"], span, {"valid": true})
+    return result
+  } catch (error) {
+    Observe.record_error(app["observer"], span, error)
+    raise_error("StructuredOutputError", str(error), null)
+  }
+  return null
+}
+
+export fn retrieve(app: object, query: string, options: object = null) -> object {
+  if app["memory"] == null {
+    return {"recent": [], "relevant": [], "context": ""}
+  }
+  return Memory.retrieve(app["memory"], query, options)
+}
+
+export fn index_documents(app: object, documents: array, options: object = null) -> number {
+  if app["memory"] == null { raise_error("MemoryError", "Application memory is disabled", null) }
+  let count = 0
+  for doc in documents {
+    let chunks = Retrieval.chunk(doc, options)
+    for item in chunks {
+      Memory.remember(app["memory"]["long"], item["content"], item["metadata"], item["id"])
+      count = count + 1
+    }
+  }
+  Observe.emit(app["observer"], "retrieval.indexed", {"chunks": count})
+  return count
+}

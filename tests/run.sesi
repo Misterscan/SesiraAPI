@@ -1,0 +1,171 @@
+/* SesiraAPI offline test suite. No provider keys or network access required. */
+allow "../index" in with Sesira
+
+let passed = 0
+let failed = 0
+
+fn check(condition: bool, name: string) {
+  if condition {
+    passed = passed + 1
+    print "✓" name
+  } else {
+    failed = failed + 1
+    print "✗" name
+  }
+}
+
+fn echo_tool(args, _context) {
+  return "echo:" + args["text"]
+}
+
+fn double_step(value, _state) {
+  return value * 2
+}
+
+fn add_one_step(value, _state) {
+  return value + 1
+}
+
+fn never_run(_state) {
+  return false
+}
+
+let retry_calls = 0
+fn retry_step(value, state) {
+  retry_calls = retry_calls + 1
+  if state["context"]["attempt"] == 1 { raise_error("RetryMe", "first attempt fails", null) }
+  return value + 10
+}
+
+fn fixed_score(_doc, _query) {
+  return 0.75
+}
+
+// Messages and templates
+let msg = Sesira.user("hello")
+check(msg["role"] == "user" && msg["content"] == "hello", "unified user message")
+let rendered = Sesira.render_prompt("Hello {{name}} from {{ place }}", {"name": "Ada", "place": "Sesi"})
+check(rendered == "Hello Ada from Sesi", "prompt template substitution")
+let missing_prompt_failed = false
+try { Sesira.render_prompt("Hello {{missing}}", {}) } catch (prompt_error) { missing_prompt_failed = true }
+check(missing_prompt_failed, "prompt templates reject unresolved values")
+let bad_message_failed = false
+try { Sesira.message("developer", "nope") } catch (message_error) { bad_message_failed = true }
+check(bad_message_failed, "message roles are validated")
+
+// Runtime JSON Schema validation
+let schema = {
+  "type": "object",
+  "properties": {
+    "name": {"type": "string"},
+    "age": {"type": "integer", "minimum": 0}
+  },
+  "required": ["name", "age"],
+  "additionalProperties": false
+}
+check(Sesira.validate({"name": "Ada", "age": 36}, schema)["valid"], "structured schema accepts valid value")
+check(!Sesira.validate({"name": "Ada", "age": "old"}, schema)["valid"], "structured schema rejects invalid value")
+check(Sesira.validate(true, {"type": "boolean"})["valid"], "JSON Schema boolean maps to Sesi bool")
+
+// Tools
+let echo = Sesira.tool("echo", "Echo input text", {
+  "type": "object",
+  "properties": {"text": {"type": "string"}},
+  "required": ["text"],
+  "additionalProperties": false
+}, echo_tool)
+let tool_ok = {"name": "echo", "args": {"text": "hi"}} | Sesira.execute_tool([echo])
+check(tool_ok["ok"] && tool_ok["result"] == "echo:hi", "tool validation and execution")
+let tool_bad = Sesira.execute_tool({"name": "echo", "args": {"text": 3}}, [echo])
+check(!tool_bad["ok"], "tool rejects invalid arguments")
+
+// Short-term memory
+let short_store = Sesira.short_memory({"limit": 2})
+Sesira.add_short({"content": "one"}, short_store)
+Sesira.add_short({"content": "two"}, short_store)
+Sesira.add_short({"content": "three"}, short_store)
+check(len(Sesira.recent_memory(short_store)) == 2 && Sesira.recent_memory(short_store)[0]["content"] == "two", "short-term memory enforces its bound")
+
+// Retrieval
+let documents = [
+  Sesira.document("Sesi uses pipe-first syntax for clear data flow.", {"topic": "language"}, "a"),
+  Sesira.document("Tomatoes grow best with sun and regular water.", {"topic": "garden"}, "b")
+]
+let matches = Sesira.search(documents, "Sesi pipe syntax", {"limit": 1})
+check(len(matches) == 1 && matches[0]["id"] == "a", "retrieval ranks relevant documents")
+let custom_matches = Sesira.search(documents, "unrelated", {"limit": 1, "scorer": fixed_score})
+check(len(custom_matches) == 1 && custom_matches[0]["score"] == 0.75, "retrieval accepts a custom scorer")
+let chunks = Sesira.chunk(Sesira.document("abcdefghij", {}, "tiny"), {"size": 6, "overlap": 2})
+check(len(chunks) == 2 && chunks[1]["metadata"]["start"] == 4, "document chunk overlap")
+
+// Persistent memory
+let memory_path = "/tmp/sesira-api-test-" + str(time()) + ".db"
+let first_store = Sesira.long_memory(memory_path, "tests")
+let saved = "Sesi applications can persist durable memory." | Sesira.remember(first_store, {"kind": "fact"}, "fact-1")
+let second_store = Sesira.long_memory(memory_path, "tests")
+let recalled = "durable memory" | Sesira.recall(second_store, {"limit": 2})
+check(saved["id"] == "fact-1" && len(recalled) > 0, "long-term memory persists and recalls")
+let loaded_memory = Sesira.get_memory("fact-1", second_store)
+check(loaded_memory != null, "long-term memory reads by stable ID")
+check(Sesira.forget("fact-1", second_store), "long-term memory deletes by stable ID")
+try { trash(memory_path, true) } catch (cleanup_error) {}
+
+// Workflows
+let steps = [
+  Sesira.step("double", double_step),
+  Sesira.step("add_one", add_one_step, {"depends_on": ["double"]})
+]
+let workflow_result = 4 | Sesira.run_workflow(steps)
+check(workflow_result["final"] == 9, "dependency workflow passes step outputs")
+let conditional = [Sesira.step("skip", double_step, {"when": never_run})]
+check((2 | Sesira.run_workflow(conditional))["outputs"]["skip"]["skipped"], "workflow conditions skip steps")
+let retried = [Sesira.step("retry", retry_step, {"retries": 1})]
+check((5 | Sesira.run_workflow(retried))["final"] == 15, "workflow retries failed steps")
+let missing_dependency_failed = false
+try {
+  1 | Sesira.run_workflow([Sesira.step("broken", double_step, {"depends_on": ["missing"]})])
+} catch (workflow_error) {
+  missing_dependency_failed = true
+}
+check(missing_dependency_failed, "workflow rejects missing dependencies")
+
+// Observability
+let obs = Sesira.observer({"enabled": true})
+Sesira.emit(obs, "custom.event", {"value": 1})
+let telemetry = Sesira.metrics(obs)
+check(telemetry["events"] == 1 && telemetry["counts"]["custom.event"] == 1, "observability records metrics")
+let custom_span = Sesira.start_span(obs, "custom.span")
+Sesira.end_span(obs, custom_span)
+check(Sesira.metrics(obs)["counts"]["span.end"] == 1, "observability records spans")
+
+// App creation without provider I/O
+let app = Sesira.create({
+  "name": "test-app",
+  "provider": "custom",
+  "model": "test-model",
+  "memory": false,
+  "observability": false,
+  "config_path": "/tmp/sesira-api-config-does-not-exist.json"
+})
+check(app["name"] == "test-app" && app["provider"]["model"] == "test-model", "application configuration")
+check(app["provider"]["name"] == "custom", "application name does not overwrite provider identity")
+
+// Invalid configuration must fail closed
+let bad_config_path = "/tmp/sesira-api-bad-config-" + str(time()) + ".json"
+try { write_file(bad_config_path, "{not json") } catch (write_error) {
+  raise_error("TestSetupError", str(write_error), null)
+}
+let bad_config_failed = false
+try {
+  Sesira.load_config(bad_config_path)
+} catch (config_error) {
+  bad_config_failed = true
+}
+check(bad_config_failed, "invalid configuration is rejected")
+try { trash(bad_config_path, true) } catch (cleanup_error) {}
+
+print ""
+print "SesiraAPI tests:" passed "passed," failed "failed"
+if failed > 0 {
+  raise_error("TestFailure", str(failed) + " test(s) failed", null)
+}

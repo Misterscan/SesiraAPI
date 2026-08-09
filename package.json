@@ -1,0 +1,26 @@
+{
+  "name": "SesiraAPI",
+  "version": "1.0.0",
+  "description": "A production-ready AI application framework written entirely in Sesi.",
+  "main": "@misterscan/sesi",
+  "bin": {
+    "sesi": "@misterscan/sesi"
+  },
+  "scripts": {
+    "test": "sesi --cli -l tests/run.sesi",
+    "start": "sesi --cli -l cli.sesi chat",
+    "init": "sesi --cli -l cli.sesi init",
+    "doctor": "sesi --cli -l cli.sesi doctor",
+    "help": "sesi --cli -l cli.sesi help"
+  },
+  "keywords": [
+    "sesi",
+    "ai",
+    "agents",
+    "chatbot",
+    "rag",
+    "workflow"
+  ],
+  "license": "MIT",
+  "dependencies": {}
+}

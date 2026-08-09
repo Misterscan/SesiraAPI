@@ -1,0 +1,122 @@
+/* Autonomous ReAct-style agents with validated tool execution. */
+allow "utils" in with Utils
+allow "schema" in with Schema
+allow "tools" in with Tools
+allow "memory" in with Memory
+allow "observability" in with Observe
+
+export fn create(app: object, options: object = null) -> object {
+  return {
+    "name": Utils.pick(options, "name", "sesira-agent"),
+    "app": app,
+    "system": Utils.pick(options, "system", "You are an autonomous, careful Sesi agent. Use tools only when they help and finish with a direct answer."),
+    "tools": Utils.pick(options, "tools", []),
+    "max_steps": Utils.pick(options, "max_steps", app["config"]["max_agent_steps"]),
+    "temperature": Utils.pick(options, "temperature", 0.1)
+  }
+}
+
+fn step_schema() -> object {
+  return {
+    "type": "object",
+    "properties": {
+      "thought": {"type": "string"},
+      "action": {"type": "string", "enum": ["tool", "final"]},
+      "tool": {"type": "string"},
+      "args": {"type": "object"},
+      "answer": {"type": "string"}
+    },
+    "required": ["thought", "action", "tool", "args", "answer"],
+    "additionalProperties": false
+  }
+}
+
+export fn run(agent: object, task: string, options: object = null) -> object {
+  let app = agent["app"]
+  let observer = app["observer"]
+  let span = Observe.start_span(observer, "agent.run", {"agent": agent["name"], "task_chars": len(task)})
+  let observations = []
+  let memory_context = ""
+  if app["memory"] != null {
+    let remembered = Memory.retrieve(app["memory"], task, {
+      "limit": app["config"]["retrieval_limit"],
+      "min_score": 0.05
+    })
+    memory_context = remembered["context"]
+  }
+  let max_steps = Utils.pick(options, "max_steps", agent["max_steps"])
+  let step_number = 0
+  while step_number < max_steps {
+    let history = ""
+    for item in observations {
+      history = history + "Step " + str(item["step"]) + ": " + Utils.safe_json(item) + "\n"
+    }
+    let prompt_text = agent["system"] + "\n\nAvailable tools:\n" + Tools.describe(agent["tools"])
+    if memory_context != "" { prompt_text = prompt_text + "\n\nRelevant memory (use only when helpful):\n" + memory_context }
+    prompt_text = prompt_text + "\n\nTask: " + task + "\n\nPrevious observations:\n" + history + "\nChoose the next action. For a final answer, set action=final, tool=\"\", args={}, and fill answer."
+    let decision = null
+    try {
+      decision = Schema.generate(app["provider"], prompt_text, step_schema(), {
+        "temperature": agent["temperature"],
+        "stream": false,
+        "system": agent["system"]
+      })
+    } catch (error) {
+      Observe.record_error(observer, span, error)
+      raise_error("AgentError", "Agent could not produce a valid next step: " + str(error), {"step": step_number})
+    }
+
+    Observe.emit(observer, "agent.decision", {
+      "agent": agent["name"],
+      "step": step_number,
+      "action": decision["action"],
+      "tool": decision["tool"]
+    })
+    if decision["action"] == "final" {
+      let result = {
+        "ok": true,
+        "answer": decision["answer"],
+        "steps": observations,
+        "step_count": step_number + 1
+      }
+      if app["memory"] != null {
+        Memory.add_turn(app["memory"], "user", task, {"agent": agent["name"]})
+        Memory.add_turn(app["memory"], "assistant", decision["answer"], {"agent": agent["name"]})
+      }
+      Observe.end_span(observer, span, {"ok": true, "steps": step_number + 1})
+      return result
+    }
+
+    let call = {"name": decision["tool"], "args": decision["args"]}
+    let execution = Tools.execute(agent["tools"], call, {
+      "app": app,
+      "agent": agent,
+      "task": task,
+      "step": step_number
+    })
+    let observation = {
+      "step": step_number,
+      "thought": decision["thought"],
+      "tool": decision["tool"],
+      "args": decision["args"],
+      "execution": execution
+    }
+    push(observations, observation)
+    Observe.emit(observer, "tool.executed", {
+      "agent": agent["name"],
+      "step": step_number,
+      "tool": decision["tool"],
+      "ok": execution["ok"],
+      "duration_ms": execution["duration_ms"]
+    })
+    step_number = step_number + 1
+  }
+  let failure = {
+    "ok": false,
+    "answer": "Agent stopped after reaching its maximum step count.",
+    "steps": observations,
+    "step_count": step_number
+  }
+  Observe.end_span(observer, span, {"ok": false, "steps": step_number, "reason": "max_steps"})
+  return failure
+}

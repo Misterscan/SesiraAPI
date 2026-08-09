@@ -1,0 +1,18 @@
+{
+  "name": "my-sesira-app",
+  "provider": "gemini",
+  "model": "gemini-3.6-flash",
+  "system": "You are a helpful assistant.",
+  "temperature": 0.2,
+  "max_tokens": 4096,
+  "thinking": "low",
+  "search": false,
+  "cache": true,
+  "short_memory_limit": 20,
+  "memory_path": ".sesira/memory.db",
+  "memory_namespace": "default",
+  "retrieval_limit": 5,
+  "max_agent_steps": 8,
+  "log_path": ".sesira/events.jsonl",
+  "observability": true
+}

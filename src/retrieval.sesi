@@ -1,0 +1,118 @@
+/* Dependency-free document chunking and lexical retrieval. */
+allow "utils" in with Utils
+
+fn non_empty(value) -> bool {
+  return trim(str(value)) != ""
+}
+
+fn score_desc(a, b) -> number {
+  return b["score"] - a["score"]
+}
+
+fn metadata_matches(metadata, wanted) -> bool {
+  if wanted == null || len(keys(wanted)) == 0 { return true }
+  if metadata == null { return false }
+  for key in keys(wanted) {
+    if metadata[key] != wanted[key] { return false }
+  }
+  return true
+}
+
+export fn terms(text: string) -> array {
+  let normalized = to_lower(text)
+  normalized = regex("[^a-z0-9]+", normalized, {
+    "mode": "replace",
+    "flags": "g",
+    "replacement": " "
+  })
+  return unique(filter(split(trim(normalized), " "), non_empty))
+}
+
+export fn score(content: string, query: string) -> number {
+  let query_terms = terms(query)
+  let content_terms = terms(content)
+  if len(query_terms) == 0 || len(content_terms) == 0 { return 0 }
+  let hits = 0
+  for token in query_terms {
+    if includes(content_terms, token) { hits = hits + 1 }
+  }
+  let coverage = hits / len(query_terms)
+  let phrase_bonus = 0
+  if contains(to_lower(content), to_lower(trim(query))) { phrase_bonus = 0.25 }
+  return Utils.clamp(coverage + phrase_bonus, 0, 1)
+}
+
+export fn document(content: string, metadata: object = null, id: string = "") -> object {
+  if metadata == null { metadata = {} }
+  if id == "" { id = Utils.make_id("doc") }
+  return {"id": id, "content": content, "metadata": metadata}
+}
+
+export fn chunk(doc, options: object = null) -> array {
+  let source = doc
+  if type(doc) == "string" { source = document(doc) }
+  let size = Utils.pick(options, "size", 1200)
+  let overlap = Utils.pick(options, "overlap", 150)
+  if size <= 0 { raise_error("ValidationError", "Chunk size must be positive", null) }
+  if overlap < 0 || overlap >= size { raise_error("ValidationError", "Chunk overlap must be smaller than size", null) }
+  let text = source["content"]
+  let chunks = []
+  let start = 0
+  let index = 0
+  while start < len(text) {
+    let finish = start + size
+    if finish > len(text) { finish = len(text) }
+    let content = trim(slice(text, start, finish))
+    if content != "" {
+      let metadata = Utils.copy_object(source["metadata"])
+      metadata["source_id"] = source["id"]
+      metadata["chunk"] = index
+      metadata["start"] = start
+      metadata["end"] = finish
+      push(chunks, document(content, metadata, source["id"] + "_chunk_" + str(index)))
+    }
+    if finish == len(text) { break }
+    start = finish - overlap
+    index = index + 1
+  }
+  return chunks
+}
+
+export fn search(documents: array, query: string, options: object = null) -> array {
+  let limit = Utils.pick(options, "limit", 5)
+  let min_score = Utils.pick(options, "min_score", 0.01)
+  let wanted = Utils.pick(options, "filter", {})
+  let custom_scorer = Utils.pick(options, "scorer", null)
+  let results = []
+  for doc in documents {
+    if metadata_matches(doc["metadata"], wanted) {
+      let relevance = 0
+      if custom_scorer == null { relevance = score(str(doc["content"]), query) } else { relevance = custom_scorer(doc, query) }
+      if relevance >= min_score {
+        let result = Utils.copy_object(doc)
+        result["score"] = relevance
+        push(results, result)
+      }
+    }
+  }
+  results = sort(results, score_desc)
+  if len(results) > limit { return slice(results, 0, limit) }
+  return results
+}
+
+export fn context(results: array, options: object = null) -> string {
+  let max_chars = Utils.pick(options, "max_chars", 12000)
+  let output = ""
+  let index = 1
+  for result in results {
+    let block = "[Source " + str(index) + " | score=" + str(result["score"]) + "]\n" + result["content"] + "\n\n"
+    if len(output) + len(block) > max_chars { break }
+    output = output + block
+    index = index + 1
+  }
+  return trim(output)
+}
+
+export fn answer_prompt(question: string, results: array) -> string {
+  return "Answer the question using the retrieved context. If the context does not support an answer, say so.\n\nContext:\n" + context(results) + "\n\nQuestion: " + question
+}

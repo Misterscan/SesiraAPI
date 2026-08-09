@@ -1,0 +1,18 @@
+/* Index documents into durable memory and retrieve them during chat. */
+allow "../index" in with Sesira
+
+let app = {
+  "provider": "gemini",
+  "model": "gemini-3.5-flash-lite",
+  "memory_path": ".sesira/knowledge.db",
+  "memory_namespace": "handbook"
+} | Sesira.create
+
+let documents = [
+  Sesira.document("Refunds are available for 30 days after purchase. Digital downloads are non-refundable after access.", {"source": "refund-policy"}, "refunds"),
+  Sesira.document("Support is available Monday through Friday, 9 AM to 6 PM Eastern.", {"source": "support-hours"}, "hours")
+]
+
+let count = documents | Sesira.index_documents(app, {"size": 500, "overlap": 50})
+print "Indexed chunks:" count
+print "Can I refund a digital download I already opened?" | Sesira.ask(app)
