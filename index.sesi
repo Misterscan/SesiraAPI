@@ -2,17 +2,17 @@
   SesiraAPI public entry point.
   Import with: allow "SesiraAPI" in with Sesira
 */
-allow "src/core" in with Core
-allow "src/providers" in with Providers
-allow "src/messages" in with Messages
-allow "src/schema" in with Schema
-allow "src/tools" in with Tools
-allow "src/agents" in with Agents
-allow "src/memory" in with Memory
-allow "src/retrieval" in with Retrieval
-allow "src/workflow" in with Workflow
-allow "src/observability" in with Observe
-allow "src/config" in with Config
+allow "src/core" in as Core
+allow "src/providers" in as Providers
+allow "src/messages" in as Messages
+allow "src/schema" in as Schema
+allow "src/tools" in as Tools
+allow "src/agents" in as Agents
+allow "src/memory" in as Memory
+allow "src/retrieval" in as Retrieval
+allow "src/workflow" in as Workflow
+allow "src/observability" in as Observe
+allow "src/config" in as Config
 
 // Application and inference
 export fn create(config: object = null) -> object { return Core.create(config) }

@@ -1,5 +1,5 @@
 /* Lightweight traces, events, JSONL logging, and aggregate metrics. */
-allow "utils" in with Utils
+allow "utils" in as Utils
 
 fn ensure_log_parent(path: string) {
   if !contains(path, "/") { return }

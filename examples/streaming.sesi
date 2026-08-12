@@ -1,8 +1,8 @@
 /* Stream chunks while retaining the complete response and usage. */
-allow "../index" in with Sesira
+allow "../index" in as Sesira
 
 fn on_chunk(chunk) {
-  print chunk
+  show chunk
 }
 
 let app = {
@@ -13,5 +13,5 @@ let app = {
 } | Sesira.create
 
 let result = "Explain Sesi pipes in three sentences." | Sesira.stream(app, on_chunk)
-print ""
-print "Completed with model:" result["model"]
+show ""
+show "Completed with model:" result["model"]

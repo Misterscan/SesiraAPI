@@ -1,6 +1,6 @@
 /* Tool definitions, validation, discovery, and safe execution. */
-allow "utils" in with Utils
-allow "schema" in with Schema
+allow "utils" in as Utils
+allow "schema" in as Schema
 
 export fn define(name: string, description: string, parameters, handler) -> object {
   Utils.assert_non_empty(name, "tool name")

@@ -1,6 +1,6 @@
 /* Runtime JSON-schema subset and structured model output. */
-allow "utils" in with Utils
-allow "providers" in with Providers
+allow "utils" in as Utils
+allow "providers" in as Providers
 
 fn validate_type(value, expected: string, path: string) -> array {
   let errors = []

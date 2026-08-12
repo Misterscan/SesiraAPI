@@ -1,5 +1,5 @@
 /* SesiraAPI offline test suite. No provider keys or network access required. */
-allow "../index" in with Sesira
+allow "../index" in as Sesira
 
 let passed = 0
 let failed = 0
@@ -7,10 +7,10 @@ let failed = 0
 fn check(condition: bool, name: string) {
   if condition {
     passed = passed + 1
-    print "✓" name
+    show "✓" name
   } else {
     failed = failed + 1
-    print "✗" name
+    show "✗" name
   }
 }
 
@@ -164,8 +164,8 @@ try {
 check(bad_config_failed, "invalid configuration is rejected")
 try { trash(bad_config_path, true) } catch (cleanup_error) {}
 
-print ""
-print "SesiraAPI tests:" passed "passed," failed "failed"
+show ""
+show "SesiraAPI tests:" passed "passed," failed "failed"
 if failed > 0 {
   raise_error("TestFailure", str(failed) + " test(s) failed", null)
 }

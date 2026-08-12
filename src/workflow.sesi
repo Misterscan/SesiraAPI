@@ -1,8 +1,8 @@
 /* Dependency-aware workflow orchestration with conditions and retries. */
-allow "utils" in with Utils
-allow "providers" in with Providers
-allow "messages" in with Messages
-allow "observability" in with Observe
+allow "utils" in as Utils
+allow "providers" in as Providers
+allow "messages" in as Messages
+allow "observability" in as Observe
 
 export fn step(id: string, handler, options: object = null) -> object {
   return {

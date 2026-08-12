@@ -1,9 +1,9 @@
 /* Autonomous ReAct-style agents with validated tool execution. */
-allow "utils" in with Utils
-allow "schema" in with Schema
-allow "tools" in with Tools
-allow "memory" in with Memory
-allow "observability" in with Observe
+allow "utils" in as Utils
+allow "schema" in as Schema
+allow "tools" in as Tools
+allow "memory" in as Memory
+allow "observability" in as Observe
 
 export fn create(app: object, options: object = null) -> object {
   return {

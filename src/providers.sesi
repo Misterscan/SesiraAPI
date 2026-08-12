@@ -1,5 +1,5 @@
 /* Native Sesi provider adapters over model(). */
-allow "utils" in with Utils
+allow "utils" in as Utils
 
 export fn provider(kind: string, options: object = null) -> object {
   let normalized = to_lower(trim(kind))
@@ -38,7 +38,7 @@ export fn from_config(config: object) -> object {
 export fn complete(adapter: object, prompt_text: string, options: object = null) -> object {
   let settings = Utils.merge(adapter, options)
   let started = time()
-  let sesiRef = ""; try { sesiRef = read_file("SesiraAPI/docs/ref/BUILTINS.md") } catch (e) {print "Warning: Could not read SesiraAPI/docs/ref/BUILTINS.md for reference."}
+  let sesiRef = ""; try { sesiRef = read_file("SesiraAPI/docs/ref/BUILTINS.md") } catch (e) {show "Warning: Could not read SesiraAPI/docs/ref/BUILTINS.md for reference."}
   let sys = "SESI LANGUAGE REFERENCES:\n" + sesiRef + "\n" + settings["system"]
   let text = ""
   if settings["name"] == "openai" || settings["name"] == "gpt" {

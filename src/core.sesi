@@ -1,12 +1,12 @@
 /* Sesira application runtime: chat, streaming, memory, retrieval, and traces. */
-allow "utils" in with Utils
-allow "config" in with Config
-allow "providers" in with Providers
-allow "messages" in with Messages
-allow "memory" in with Memory
-allow "retrieval" in with Retrieval
-allow "schema" in with Schema
-allow "observability" in with Observe
+allow "utils" in as Utils
+allow "config" in as Config
+allow "providers" in as Providers
+allow "messages" in as Messages
+allow "memory" in as Memory
+allow "retrieval" in as Retrieval
+allow "schema" in as Schema
+allow "observability" in as Observe
 
 export fn create(overrides: object = null) -> object {
   let path = Utils.pick(overrides, "config_path", "sesira.json")

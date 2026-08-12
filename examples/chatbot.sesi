@@ -1,5 +1,5 @@
 /* Persistent chatbot with the pipe-first SesiraAPI. */
-allow "../index" in with Sesira
+allow "../index" in as Sesira
 
 let app = {
   "name": "support-bot",
@@ -11,5 +11,5 @@ let app = {
 } | Sesira.create
 
 let response = "How do I reset my password?" | Sesira.chat(app)
-print response["text"]
-print "Tokens:" response["usage"]["total_tokens"]
+show response["text"]
+show "Tokens:" response["usage"]["total_tokens"]

@@ -1,7 +1,7 @@
 /* In-process short-term memory and persistent std/db long-term memory. */
 allow "std/db" in with {db_open}
-allow "utils" in with Utils
-allow "retrieval" in with Retrieval
+allow "utils" in as Utils
+allow "retrieval" in as Retrieval
 
 fn ensure_parent(path: string) {
   if !contains(path, "/") { return }

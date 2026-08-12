@@ -1,5 +1,5 @@
 /* Runtime structured output with validation and one automatic repair pass. */
-allow "../index" in with Sesira
+allow "../index" in as Sesira
 
 let app = {"provider": "gemini", "model": "gemini-3.5-flash-lite", "memory": false} | Sesira.create
 let schema = {
@@ -14,4 +14,4 @@ let schema = {
 }
 
 let result = "Analyze: Sesi makes data workflows delightfully readable." | Sesira.structured(app, schema)
-print result
+show result
