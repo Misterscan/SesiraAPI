@@ -3,6 +3,15 @@ allow "std/db" in with {db_open}
 allow "utils" in as Utils
 allow "retrieval" in as Retrieval
 
+/**
+  Ensure that the parent directory of a given path exists.
+
+  Parameters:
+  - path: The file path whose parent directory should be ensured.
+
+  Returns:
+  - None.
+*/
 fn ensure_parent(path: string) {
   if !contains(path, "/") { return }
   let parts = split(path, "/")
@@ -12,6 +21,15 @@ fn ensure_parent(path: string) {
   try { make_dir(parent) } catch (error) {}
 }
 
+/**
+  Generate a valid collection name for a given namespace.
+
+  Parameters:
+  - namespace: The namespace to generate the collection name for.
+
+  Returns:
+  - A string representing the collection name.
+*/
 fn collection_name(namespace: string) -> string {
   let clean = regex("[^a-zA-Z0-9_-]+", namespace, {
     "mode": "replace",
@@ -21,6 +39,25 @@ fn collection_name(namespace: string) -> string {
   return "memory_" + clean
 }
 
+/**
+  Create a short-term memory store.
+
+  Parameters:
+  - options: An object containing configuration options for the short-term memory store.
+
+  Returns:
+  - An object representing the short-term memory store.
+
+  Example:
+  ```sesi
+  let store = short({"limit": 10})
+  ```
+
+  Output:
+  ```sesi
+  {"kind": "short", "messages": [], "limit": 10}
+  ```
+*/
 export fn short(options: object = null) -> object {
   return {
     "kind": "short",
@@ -29,6 +66,28 @@ export fn short(options: object = null) -> object {
   }
 }
 
+/**
+  Add an item to the short-term memory store.
+
+  Parameters:
+  - store: The short-term memory store object.
+  - item: The item to add to the store.
+
+  Returns:
+  - The added item.
+
+  Example:
+  ```sesi
+  let store = short({"limit": 10})
+  let item = {"role": "user", "content": "Hello"}
+  let added = add_short(store, item)
+  ```
+
+  Output:
+  ```sesi
+  {"role": "user", "content": "Hello"}
+  ```
+*/
 export fn add_short(store: object, item) -> object {
   push(store["messages"], item)
   let limit = store["limit"]
@@ -38,17 +97,79 @@ export fn add_short(store: object, item) -> object {
   return item
 }
 
+/**
+  Retrieve the most recent items from the short-term memory store.
+
+  Parameters:
+  - store: The short-term memory store object.
+  - limit: The maximum number of recent items to retrieve (default is 0, which means all items).
+
+  Returns:
+  - An array of the most recent items.
+
+  Example:
+  ```sesi
+  let store = short({"limit": 10})
+  let recent_items = recent(store, 5)
+  ```
+
+  Output:
+  ```sesi
+  [{"role": "user", "content": "Hello"}]
+  ```
+*/
 export fn recent(store: object, limit: number = 0) -> array {
   let messages = store["messages"]
   if limit <= 0 || len(messages) <= limit { return messages }
   return slice(messages, len(messages) - limit)
 }
 
+/**
+  Clear all items from the short-term memory store.
+
+  Parameters:
+  - store: The short-term memory store object.
+
+  Returns:
+  - A boolean indicating whether the operation was successful.
+
+  Example:
+  ```sesi
+  let store = short({"limit": 10})
+  let success = clear_short(store)
+  ```
+
+  Output:
+  ```sesi
+  true
+  ```
+*/
 export fn clear_short(store: object) -> bool {
   store["messages"] = []
   return true
 }
 
+/**
+  Create a long-term memory store.
+
+  Parameters:
+  - path: The file path to the database.
+  - namespace: The namespace for the long-term memory store (default is "default").
+  - password: The password for the database (default is null).
+
+  Returns:
+  - An object representing the long-term memory store.
+
+  Example:
+  ```sesi
+  let store = long(".sesira/memory.db", "default")
+  ```
+
+  Output:
+  ```sesi
+  {"kind": "long", "path": ".sesira/memory.db", "namespace": "default", "database": ..., "records": ...}
+  ```
+*/
 export fn long(path: string, namespace: string = "default", password = null) -> object {
   ensure_parent(path)
   let database = null
@@ -67,6 +188,29 @@ export fn long(path: string, namespace: string = "default", password = null) -> 
   }
 }
 
+/**
+  Add a memory record to the long-term memory store.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - content: The content of the memory record.
+  - metadata: Additional metadata for the memory record (default is null).
+  - id: The unique identifier for the memory record (default is an empty string, which generates a new ID).
+
+  Returns:
+  - The added memory record object.
+
+  Example:
+  ```sesi
+  let store = long(".sesira/memory.db", "default")
+  let record = remember(store, "Hello world")
+  ```
+
+  Output:
+  ```sesi
+  {"id": "...", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}
+  ```
+*/
 export fn remember(store: object, content: string, metadata: object = null, id: string = "") -> object {
   if metadata == null { metadata = {} }
   if id == "" { id = Utils.make_id("memory") }
@@ -88,30 +232,154 @@ export fn remember(store: object, content: string, metadata: object = null, id: 
   return record
 }
 
+/**
+  Retrieve a memory record from the long-term memory store by its ID.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - id: The unique identifier of the memory record.
+
+  Returns:
+  - The memory record object if found, otherwise null.
+
+  Example:
+  ```sesi
+  let store = long(".sesira/memory.db", "default")
+  let record = get(store, "some_id")
+  ```
+
+  Output:
+  ```sesi
+  {"id": "some_id", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}
+  ```
+*/
 export fn get(store: object, id: string) {
   let found = store["records"].find({"id": id})
   if len(found) == 0 { return null }
   return found[0]
 }
 
+/**
+  Retrieve all memory records from the long-term memory store.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - limit: The maximum number of records to retrieve (default is 0, which retrieves all records).
+
+  Returns:
+  - An array of memory record objects.
+
+  Example:
+  ```sesi
+  let store = long(".sesira/memory.db", "default")
+  let records = all(store, 10)
+  ```
+
+  Output:
+  ```sesi
+  [{"id": "...", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}, ...]
+  ```
+*/
 export fn all(store: object, limit: number = 0) -> array {
   let records = store["records"].find({})
   if limit > 0 && len(records) > limit { return slice(records, 0, limit) }
   return records
 }
 
+/**
+  Retrieve relevant memory records from the long-term memory store based on a query.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - query: The query string to search for relevant memory records.
+  - options: Additional options for the retrieval (default is null).
+
+  Returns:
+  - An array of relevant memory record objects.
+
+  Example:
+  ```sesi
+  let store = long(".sesira/memory.db", "default")
+  let matches = recall(store, "Hello world")
+  ```
+
+  Output:
+  ```sesi
+  [{"id": "...", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}, ...]
+  ```
+*/
 export fn recall(store: object, query: string, options: object = null) -> array {
   return Retrieval.search(all(store), query, options)
 }
 
+/**
+  Delete a memory record from the long-term memory store by its ID.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - id: The unique identifier of the memory record to delete.
+
+  Returns:
+  - A boolean indicating whether the deletion was successful.
+
+  Example:
+  ```sesi
+  let store = long(".sesira/memory.db", "default")
+  let success = forget(store, "some_id")
+  ```
+
+  Output:
+  ```sesi
+  true
+  ```
+*/
 export fn forget(store: object, id: string) -> bool {
   return store["records"].delete({"id": id}) > 0
 }
 
+/**
+  Clear all memory records from the long-term memory store.
+
+  Parameters:
+  - store: The long-term memory store object.
+
+  Returns:
+  - The number of records deleted.
+
+  Example:
+  ```sesi
+  let store = long(".sesira/memory.db", "default")
+  let deleted_count = clear_long(store)
+  ```
+
+  Output:
+  ```sesi
+  10
+  ```
+*/
 export fn clear_long(store: object) -> number {
   return store["records"].delete({})
 }
 
+/**
+  Create and return a memory bank object containing both short-term and long-term memory stores.
+
+  Parameters:
+  - options: An object containing configuration options for the memory bank (default is null).
+
+  Returns:
+  - An object containing the short-term and long-term memory stores.
+
+  Example:
+  ```sesi
+  let bank_store = bank({"path": ".sesira/memory.db", "namespace": "default"})
+  ```
+
+  Output:
+  ```sesi
+  {"short": {...}, "long": {...}}
+  ```
+*/
 export fn bank(options: object = null) -> object {
   let path = Utils.pick(options, "path", ".sesira/memory.db")
   let namespace = Utils.pick(options, "namespace", "default")
@@ -125,6 +393,29 @@ export fn bank(options: object = null) -> object {
   }
 }
 
+/**
+  Add a conversation turn to the memory bank, storing it in both short-term and long-term memory.
+
+  Parameters:
+  - bank_store: The memory bank object containing short-term and long-term memory stores.
+  - role: The role of the participant in the conversation (e.g., "user" or "assistant").
+  - content: The content of the conversation turn.
+  - metadata: Additional metadata for the conversation turn (default is null).
+
+  Returns:
+  - The conversation turn object that was added.
+
+  Example:
+  ```sesi
+  let bank_store = bank({"path": ".sesira/memory.db", "namespace": "default"})
+  let turn = add_turn(bank_store, "user", "Hello!", {"mood": "happy"})
+  ```
+
+  Output:
+  ```sesi
+  {"role": "user", "content": "Hello!", "metadata": {"mood": "happy"}, "timestamp": ...}
+  ```
+*/
 export fn add_turn(bank_store: object, role: string, content: string, metadata: object = null) -> object {
   if metadata == null { metadata = {} }
   let item = {
@@ -142,6 +433,32 @@ export fn add_turn(bank_store: object, role: string, content: string, metadata: 
   return item
 }
 
+/**
+  Retrieve relevant conversation turns from the memory bank based on a query.
+
+  Parameters:
+  - bank_store: The memory bank object containing short-term and long-term memory stores.
+  - query: The query string to search for relevant conversation turns.
+  - options: Additional options for the retrieval (default is null).
+
+  Returns:
+  - An object containing recent short-term memory, relevant long-term memory matches, and context.
+
+  Example:
+  ```sesi
+  let bank_store = bank({"path": ".sesira/memory.db", "namespace": "default"})
+  let results = retrieve(bank_store, "Hello!", {"limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "recent": [...],
+    "relevant": [...],
+    "context": "..."
+  }
+  ```
+*/
 export fn retrieve(bank_store: object, query: string, options: object = null) -> object {
   let matches = recall(bank_store["long"], query, options)
   return {

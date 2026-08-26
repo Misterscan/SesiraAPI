@@ -1,5 +1,24 @@
 /* Internal, dependency-free utility helpers. */
 
+/**
+  Creates a shallow copy of the given object.
+
+  Parameters:
+  - `source`: The object to be copied.
+
+  Returns:
+  - A shallow copy of the `source` object.
+
+  Example:
+  ```sesi
+  let copy = copy_object({"key": "value"})
+  ```
+
+  Output:
+  ```sesi
+  {"key": "value"}
+  ```
+*/
 export fn copy_object(source: object) -> object {
   let result = {}
   if source == null { return result }
@@ -9,6 +28,26 @@ export fn copy_object(source: object) -> object {
   return result
 }
 
+/**
+  Merges two objects, with the `overrides` object taking precedence.
+
+  Parameters:
+  - `base`: The base object.
+  - `overrides`: The object with overriding values.
+
+  Returns:
+  - A new object containing the merged key-value pairs.
+
+  Example:
+  ```sesi
+  let merged = merge({"key1": "value1"}, {"key2": "value2"})
+  ```
+
+  Output:
+  ```sesi
+  {"key1": "value1", "key2": "value2"}
+  ```
+*/
 export fn merge(base: object, overrides: object) -> object {
   let result = copy_object(base)
   if overrides == null { return result }
@@ -20,18 +59,77 @@ export fn merge(base: object, overrides: object) -> object {
   return result
 }
 
+/**
+  Generates a unique identifier string with an optional prefix.
+
+  Parameters:
+  - `prefix`: The prefix for the generated ID. Defaults to `"id"`.
+
+  Returns:
+  - A unique identifier string.
+
+  Example:
+  ```sesi
+  let id = make_id("prefix")
+  ```
+
+  Output:
+  ```sesi
+  prefix_1681234567_123456
+  ```
+*/
 export fn make_id(prefix: string = "id") -> string {
   let random_part = str(random())
   random_part = swap(random_part, "0.", "")
   return prefix + "_" + str(time()) + "_" + random_part
 }
 
+/**
+  Clamps a number between a lower and upper bound.
+
+  Parameters:
+  - `value`: The number to be clamped.
+  - `low`: The lower bound.
+  - `high`: The upper bound.
+
+  Returns:
+  - The clamped number.
+
+  Example:
+  ```sesi
+  let clamped = clamp(10, 0, 5)
+  ```
+
+  Output:
+  ```sesi
+  5
+  ```
+*/
 export fn clamp(value: number, low: number, high: number) -> number {
   if value < low { return low }
   if value > high { return high }
   return value
 }
 
+/**
+  Safely converts a value to a JSON string.
+
+  Parameters:
+  - `value`: The value to be converted.
+
+  Returns:
+  - A JSON string representation of the value, or a string fallback if conversion fails.
+
+  Example:
+  ```sesi
+  let json = safe_json({"key": "value"})
+  ```
+
+  Output:
+  ```sesi
+  "{\"key\": \"value\"}"
+  ```
+*/
 export fn safe_json(value) -> string {
   try {
     return to_json(value)
@@ -40,17 +138,77 @@ export fn safe_json(value) -> string {
   }
 }
 
+/**
+  Ensures the given value is returned as an array.
+
+  Parameters:
+  - `value`: The value to be converted to an array.
+
+  Returns:
+  - An array containing the value, or the value itself if it is already an array.
+
+  Example:
+  ```sesi
+  let arr = as_array("value")
+  ```
+
+  Output:
+  ```sesi
+  ["value"]
+  ```
+*/
 export fn as_array(value) -> array {
   if value == null { return [] }
   if type(value) == "array" { return value }
   return [value]
 }
 
+/**
+  Checks if an object contains a specific key.
+
+  Parameters:
+  - `value`: The object to check.
+  - `key`: The key to look for.
+
+  Returns:
+  - `true` if the key exists in the object, `false` otherwise.
+
+  Example:
+  ```sesi
+  let exists = contains_key({"key": "value"}, "key")
+  ```
+
+  Output:
+  ```sesi
+  true
+  ```
+*/
 export fn contains_key(value, key: string) -> bool {
   if type(value) != "object" { return false }
   return includes(keys(value), key)
 }
 
+/**
+  Retrieves the value associated with a specific key from an object, with a fallback if the key is not present.
+
+  Parameters:
+  - `value`: The object to retrieve the value from.
+  - `key`: The key whose value should be retrieved.
+  - `fallback`: The value to return if the key is not present or the value is `null`.
+
+  Returns:
+  - The value associated with the key, or the fallback if the key is not present or the value is `null`.
+
+  Example:
+  ```sesi
+  let value = pick({"key": "value"}, "key", "default")
+  ```
+
+  Output:
+  ```sesi
+  "value"
+  ```
+*/
 export fn pick(value: object, key: string, fallback) {
   if value != null && contains_key(value, key) && value[key] != null {
     return value[key]
@@ -58,6 +216,26 @@ export fn pick(value: object, key: string, fallback) {
   return fallback
 }
 
+/**
+  Cleans a JSON string by removing code block markers and trimming whitespace.
+
+  Parameters:
+  - `text`: The JSON string to be cleaned.
+
+  Returns:
+  - The cleaned JSON string.
+
+  Example:
+
+  ```sesi
+  let cleaned = clean_json_text("```json\n{\"key\": \"value\"}\n```")
+  ```
+
+  Output:
+  ```sesi
+  {"key": "value"}
+  ```
+*/
 export fn clean_json_text(text: string) -> string {
   let cleaned = trim(text)
   cleaned = swap(cleaned, "```json", "")
@@ -66,6 +244,25 @@ export fn clean_json_text(text: string) -> string {
   return trim(cleaned)
 }
 
+/**
+  Serializes an error object into a standardized format.
+
+  Parameters:
+  - `error`: The error object to be serialized.
+
+  Returns:
+  - An object containing the error name and message.
+
+  Example:
+  ```sesi
+  let error_obj = serialize_error("Something went wrong")
+  ```
+
+  Output:
+  ```sesi
+  {"name": "RuntimeError", "message": "Something went wrong"}
+  ```
+*/
 export fn serialize_error(error) -> object {
   return {
     "name": "RuntimeError",
@@ -73,6 +270,26 @@ export fn serialize_error(error) -> object {
   }
 }
 
+/**
+  Asserts that a string value is non-empty, raising a validation error if it is empty.
+
+  Parameters:
+  - `value`: The string value to check.
+  - `label`: The label for the value, used in the error message.
+
+  Returns:
+  - The original string value if it is non-empty.
+
+  Example:
+  ```sesi
+  let non_empty = assert_non_empty("value", "Field")
+  ```
+
+  Output:
+  ```sesi
+  "value"
+  ```
+*/
 export fn assert_non_empty(value: string, label: string) -> string {
   if value == null || trim(value) == "" {
     raise_error("ValidationError", label + " cannot be empty", {"field": label})

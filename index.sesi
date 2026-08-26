@@ -15,67 +15,1348 @@ allow "src/observability" in as Observe
 allow "src/config" in as Config
 
 // Application and inference
+/**
+  Create a new Sesira application runtime with chat, streaming, memory, retrieval, and observability capabilities.
+
+  Parameters:
+  - overrides: An object containing optional configuration overrides for the application, including:
+    - config_path: The path to the configuration file (default is "sesira.json").
+
+  Returns:
+  - An object representing the created application with its configuration, provider, memory store, and observer.
+
+  Example:
+
+  ```sesi
+  let my_app = create({"config_path": "sesira.json"})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "name": "sesira-app",
+    "config": {...},
+    "provider": {...},
+    "memory": {...},
+    "observer": {...}
+  }
+  ```
+*/
 export fn create(config: object = null) -> object { return Core.create(config) }
+/**
+  Creates a provider configuration object based on the specified kind and options.
+
+  Parameters:
+  - `kind`: The type of provider (e.g., "gemini", "openai", "local", "sesi", "custom").
+  - `options`: An optional object containing provider-specific configuration options.
+    - `name`: The name of the provider. This is derived from the `kind` parameter and normalized to lowercase.
+    - `model`: The model to be used by the provider. Defaults are set based on the `kind` of provider.
+    - `system`: The system prompt or instructions for the provider.
+    - `temperature`: The sampling temperature for the model. Defaults to 0.2.
+    - `max_tokens`: The maximum number of tokens to generate. Defaults to 4096.
+    - `thinking`: The thinking level for the model. Defaults to "low".
+    - `search`: Whether to enable search functionality. Defaults to `false`.
+    - `cache`: Whether to enable caching. Defaults to `true`.
+    - `stream`: Whether to enable streaming responses. Defaults to `false`.
+    - `images`: An array of images associated with the provider. Defaults to an empty array.
+    - `tools`: An array of tools associated with the provider. Defaults to an empty array.
+
+  Returns:
+  - A provider configuration object containing the merged settings.
+
+  Example:
+  ```sesi
+  let config = provider("openai", {
+    "system": "You are a helpful assistant.",
+    "temperature": 0.5,
+    "max_tokens": 500,
+    "thinking": "low",
+    "search": false,
+    "cache": true,
+    "stream": false,
+    "images": [],
+    "tools": [fixErrors, autoComplete, summarize, analyze]
+  })
+  ```
+
+  Output:
+  ```sesi
+  {
+    "name": "openai",
+    "model": "gpt-5.6-terra",
+    "system": "You are a helpful assistant.",
+    "temperature": 0.5,
+    "max_tokens": 500,
+    "thinking": "low",
+    "search": false,
+    "cache": true,
+    "stream": false,
+    "images": [],
+    "tools": [fixErrors, autoComplete, summarize, analyze]
+  }
+  ```
+*/
 export fn provider(kind: string, options: object = null) -> object { return Providers.provider(kind, options) }
+/**
+  Sends a completion request to the specified provider adapter with the given prompt and options.
+
+  Parameters:
+  - `adapter`: The provider adapter configuration object.
+  - `prompt_text`: The prompt text to be completed.
+  - `options`: An optional object containing additional completion options.
+
+  Returns:
+  - An object containing the completion result, including the generated text, usage information, and duration.
+
+  Example:
+  ```sesi
+  let config = from_config({"provider": "openai", "temperature": 0.5})
+  let result = complete(config, "Explain the concept of provider adapters.")
+  ```
+
+  Output:
+  ```sesi
+  {
+    "id": "<generated_id>",
+    "provider": "openai",
+    "model": "gpt-5.6-terra",
+    "text": "Explain the concept of provider adapters.",
+    "usage": {...},
+    "duration_ms": <time_taken>
+  }
+  ```
+*/
 export fn complete(prompt_text: string, adapter: object, options: object = null) -> object { return Providers.complete(adapter, prompt_text, options) }
+/**
+  Perform a chat interaction with the application, sending user input and receiving a response.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - input: The user input message(s) to be processed.
+  - options: An optional object containing additional options for the chat, such as retrieval limits and streaming callbacks.
+
+  Returns:
+  - An object representing the chat response, including the generated text, retrieval context, and usage information.
+
+  Example:
+
+  ```sesi
+  let response = chat(my_app, "Hello, how are you?", {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "text": "I'm doing well, thank you!",
+    "retrieval": [...],
+    "usage": {...}
+  }
+  ```
+*/
 export fn chat(input, app: object, options: object = null) -> object { return Core.chat(app, input, options) }
+/**
+  Ask the application a question and receive a text response.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - input: The user input message(s) to be processed.
+  - options: An optional object containing additional options for the chat, such as retrieval limits and streaming callbacks.
+
+  Returns:
+  - A string representing the generated response text from the application.
+
+  Example:
+
+  ```sesi
+  let answer = ask(my_app, "What is the capital of France?", {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  "The capital of France is Paris."
+  ```
+*/
 export fn ask(input, app: object, options: object = null) -> string { return Core.ask(app, input, options) }
+/**
+  Stream a chat interaction with the application, sending user input and receiving partial responses via a callback.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - input: The user input message(s) to be processed.
+  - on_chunk: A callback function to handle partial response chunks.
+  - options: An optional object containing additional options for the chat, such as retrieval limits and streaming callbacks.
+
+  Returns:
+  - An object representing the final chat response, including the generated text, retrieval context, and usage information.
+  
+  Example:
+
+  ```sesi
+  fn on_chunk(chunk) { show chunk }
+  let response = stream("Hello, how are you?", my_app, on_chunk, {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "text": "I'm doing well, thank you!",
+    "retrieval": [...],
+    "usage": {...}
+  }
+  ```
+*/
 export fn stream(input, app: object, on_chunk, options: object = null) -> object { return Core.stream(app, input, on_chunk, options) }
+/**
+  Generate structured output from the application based on a prompt and a schema.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - prompt_text: The prompt text to be processed.
+  - schema: The schema defining the expected structure of the output.
+  - options: An optional object containing additional options for the structured generation.
+
+  Returns:
+  - The generated structured output according to the provided schema.
+
+  Example:
+
+  ```sesi
+  let result = structured("Extract the name and age from the text.", my_app, my_schema, {"temperature": 0})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "name": "John Doe",
+    "age": 30
+  }
+  ```
+*/
 export fn structured(prompt_text: string, app: object, schema, options: object = null) { return Core.structured(app, prompt_text, schema, options) }
 
 // Messages and prompts
+/**
+  Create a message object with a specified role, content, and optional metadata.
+
+  Parameters:
+  - role: The role of the message (system, user, assistant, tool).
+  - content: The content of the message, either a string or an array of content parts.
+  - metadata: An optional object containing additional metadata for the message.
+
+  Returns:
+  - The created message object.
+
+  Example:
+  ```sesi
+  let msg = message("user", "Help me understand this topic", {"timestamp": 1234567890})
+  ```
+
+  Output:
+  ```sesi
+  {"role": "user", "content": "Help me understand this topic", "metadata": {"timestamp": 1234567890}}
+  ```
+*/
 export fn message(role: string, content, metadata: object = null) -> object { return Messages.message(role, content, metadata) }
+
+/**
+  Create a system message.
+
+  Parameters:
+  - content: The content of the system message.
+
+  Returns:
+  - The created system message object.
+*/
 export fn system(content: string) -> object { return Messages.system(content) }
+/**
+  Create a user message.
+
+  Parameters:
+  - content: The content of the user message.
+
+  Returns:
+  - The created user message object.
+*/
 export fn user(content) -> object { return Messages.user(content) }
+/**
+  Create an assistant message.
+
+  Parameters:
+  - content: The content of the assistant message.
+
+  Returns:
+  - The created assistant message object.
+*/
 export fn assistant(content) -> object { return Messages.assistant(content) }
+
+/**
+  Create a tool result message.
+
+  Parameters:
+  - name: The name of the tool.
+  - content: The content of the tool result message.
+  - call_id: An optional call ID associated with the tool result.
+
+  Returns:
+  - The created tool result message object.
+
+  Example:
+  ```sesi
+  let tool_msg = tool_result("image_generator", "Generated an image successfully", "call_123")
+  ```
+
+  Output:
+  ```sesi
+  {"role": "tool", "content": "Generated an image successfully", "metadata": {"tool": "image_generator"}, "name": "image_generator", "call_id": "call_123"}
+  ```
+*/
 export fn tool_result(name: string, content, call_id: string = "") -> object { return Messages.tool_result(name, content, call_id) }
+
+/**
+  Create a text content part.
+
+  Parameters:
+  - text: The text content.
+
+  Returns:
+  - The created text content part object.
+
+  Example:
+  ```sesi
+  let text = text_part("Hello, world!")
+  ```
+
+  Output:
+  ```sesi
+  {"type": "text", "text": "Hello, world!"}
+  ```
+*/
 export fn text_part(text: string) -> object { return Messages.text_part(text) }
+
+/**
+  Create an image content part.
+
+  Parameters:
+  - path: The path to the image file.
+
+  Returns:
+  - The created image content part object.
+
+  Example:
+  ```sesi
+  let img = image_part("path/to/image.png")
+  ```
+
+  Output:
+  ```sesi
+  {"type": "image", "path": "path/to/image.png"}
+  ```
+*/
 export fn image_part(path: string) -> object { return Messages.image_part(path) }
+
+/**
+  Create an audio content part.
+
+  Parameters:
+  - path: The path to the audio file.
+
+  Returns:
+  - The created audio content part object.
+
+  Example:
+  ```sesi
+  let audio = audio_part("path/to/audio.mp3")
+  ```
+
+  Output:
+  ```sesi
+  {"type": "audio", "path": "path/to/audio.mp3"}
+  ```
+*/
 export fn audio_part(path: string) -> object { return Messages.audio_part(path) }
+
+/**
+  Render a template string by replacing placeholders with values from an object.
+
+  Parameters:
+  - text: The template string containing placeholders in the form {{key}}.
+  - values: An object containing the values to replace the placeholders with.
+
+  Returns:
+  - The rendered string with all placeholders replaced by their corresponding values.
+
+  Example:
+  ```sesi
+  let text = "Hello, {{name}}!"
+  let values = {"name": "World"}
+  let rendered = render_prompt(text, values)
+  ```
+  Output:
+  ```sesi
+  "Hello, World!"
+  ```
+*/
 export fn render_prompt(text: string, values: object) -> string { return Messages.template(text, values) }
+
+/**
+  Render an array of messages into a string representation.
+
+  Parameters:
+  - messages: The array of messages to render.
+
+  Returns:
+  - A string representation of the messages.
+
+  Example:
+  ```sesi
+  let rendered = render_messages([user("Hello, world!"), assistant("Hi there!")])
+  ```
+
+  Output:
+  ```sesi
+  "USER: Hello, world!
+  ASSISTANT: Hi there!"
+  ```
+*/
 export fn render_messages(messages) -> string { return Messages.render(messages) }
+
+/**
+  Extract the text content from a message content array.
+
+  Parameters:
+  - content: The message content, which can be a string or an array of content parts.
+
+  Returns:
+  - The extracted text content as a string.
+
+  Example:
+  ```sesi
+  let response = message("user", "You can extract text from the response.")
+  let text = message_text(response)
+  ```
+
+  Output:
+  ```sesi
+  "Extracted result."
+  ```
+*/
 export fn message_text(content) -> string { return Messages.content_text(content) }
 
 // Tools and agents
+/**
+  Define a new tool with a name, description, parameters, and a handler function.
+
+  Parameters:
+  - name: The name of the tool.
+  - description: A brief description of the tool's functionality.
+  - parameters: The JSON Schema describing the tool's input parameters.
+  - handler: The function that implements the tool's behavior.
+
+  Returns:
+  - An object representing the defined tool.
+
+  Example:
+  ```sesi
+  fn greet(args) {
+    return "Hello, " + args["name"]
+  }
+  
+  let my_tool = tool("greet", "Greet a user", {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, greet)
+  ```
+
+  Output:
+  ```sesi
+  {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ```
+*/
 export fn tool(name: string, description: string, parameters, handler) -> object { return Tools.define(name, description, parameters, handler) }
+
+/**
+  Execute a tool call with the given arguments and context.
+
+  Parameters:
+  - tools: An array of tool definitions.
+  - call: An object representing the tool call, with "name" and "args" or "arguments".
+  - context: An optional context object to pass to the tool handler.
+
+  Returns:
+  - An object containing the execution result, including "ok", "tool", "result", "error", and "duration_ms".
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ]
+  let call = {"name": "greet", "args": {"name": "Alice"}}
+  let result = execute_tool(tools, call)
+  ```
+
+  Output:
+  ```sesi
+  {"ok": true, "tool": "greet", "result": "Hello, Alice!", "duration_ms": 0}
+  ```
+*/
 export fn execute_tool(call: object, tools: array, context: object = null) -> object { return Tools.execute(tools, call, context) }
+
+/**
+  Generate the JSON Schemas for a list of tools, optionally formatted for a specific provider.
+
+  Parameters:
+  - tools: An array of tool definitions.
+  - provider_name: The name of the provider for which to format the schemas (default: "gemini").
+
+  Returns:
+  - An array of JSON Schema declarations for the tools.
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ]
+  let schemas_output = tool_schemas(tools, "openai")
+  ```
+
+  Output:
+  ```sesi
+  [{"type": "function", "function": {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}}]
+  ```
+*/
 export fn tool_schemas(tools: array, provider_name: string = "gemini") -> array { return Tools.schemas(tools, provider_name) }
+
+/**
+  Register native tools with the system.
+
+  Parameters:
+  - tools: An array of tool definitions, each containing "name", "handler", and "description".
+
+  Returns:
+  - An array of names of successfully registered tools.
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "handler": greet}
+  ]
+  let registered = register_tools(tools)
+  ```
+
+  Output:
+  ```sesi
+  ["greet"]
+  ```
+*/
 export fn register_tools(tools: array) -> array { return Tools.register_native(tools) }
+
+/**
+  Create a new autonomous ReAct-style agent with validated tool execution.
+
+  Parameters:
+  - app: The application object containing configuration and resources.
+  - options: An object containing optional configuration for the agent, including:
+    - name: The name of the agent (default is "sesira-agent").
+    - system: The system prompt for the agent (default is a careful Sesi agent description).
+    - tools: An array of tools available to the agent (default is an empty array).
+    - max_steps: The maximum number of steps the agent can take (default is from app config).
+    - temperature: The temperature for the agent's decision-making (default is 0.1).
+
+  Returns:
+  - An object representing the created agent with its configuration and resources.
+
+  Example:
+
+  ```sesi
+  let my_agent = create_agent(my_app, {"name": "example-agent", "tools": [my_tool]})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "name": "example-agent",
+    "app": my_app,
+    "system": "You are an autonomous, careful Sesi agent. Use tools only when they help and finish with a direct answer.",
+    "tools": [my_tool],
+    "max_steps": my_app["config"]["max_agent_steps"],
+    "temperature": 0.1
+  }
+  ```
+*/
 export fn create_agent(app: object, options: object = null) -> object { return Agents.create(app, options) }
+
+/**
+  Run the agent on a given task, executing steps until a final answer is produced or the maximum number of steps is reached.
+
+  Parameters:
+  - agent: The agent object created by the `create` function.
+  - task: The task string that the agent should work on.
+  - options: An object containing optional configuration for the run, including:
+    - max_steps: The maximum number of steps to execute (default is the agent's max_steps).
+
+  Returns:
+  - An object containing the final answer, the sequence of steps taken, and the step count.
+
+  Example:
+
+  ```sesi
+  let result = run_agent(my_agent, "Solve this task", {"max_steps": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "ok": true,
+    "final": "The final answer",
+    "steps": [...],
+    "step_count": 3
+  }
+  ```
+*/
 export fn run_agent(task: string, agent: object, options: object = null) -> object { return Agents.run(agent, task, options) }
 
 // Memory and retrieval
+/**
+  Create a short-term memory store.
+
+  Parameters:
+  - options: An object containing configuration options for the short-term memory store.
+
+  Returns:
+  - An object representing the short-term memory store.
+
+  Example:
+  ```sesi
+  let store = short_memory({"limit": 10})
+  ```
+
+  Output:
+  ```sesi
+  {"kind": "short", "messages": [], "limit": 10}
+  ```
+*/
 export fn short_memory(options: object = null) -> object { return Memory.short(options) }
+
+/**
+  Create a long-term memory store.
+
+  Parameters:
+  - path: The file path to the database.
+  - namespace: The namespace for the long-term memory store (default is "default").
+  - password: The password for the database (default is null).
+
+  Returns:
+  - An object representing the long-term memory store.
+
+  Example:
+  ```sesi
+  let store = long_memory(".sesira/memory.db", "default")
+  ```
+
+  Output:
+  ```sesi
+  {"kind": "long", "path": ".sesira/memory.db", "namespace": "default", "database": ..., "records": ...}
+  ```
+*/
 export fn long_memory(path: string, namespace: string = "default", password = null) -> object { return Memory.long(path, namespace, password) }
+
+/**
+  Create and return a memory bank object containing both short-term and long-term memory stores.
+
+  Parameters:
+  - options: An object containing configuration options for the memory bank (default is null).
+
+  Returns:
+  - An object containing the short-term and long-term memory stores.
+
+  Example:
+  ```sesi
+  let bank_store = memory_bank({"path": ".sesira/memory.db", "namespace": "default"})
+  ```
+
+  Output:
+  ```sesi
+  {"short": {...}, "long": {...}}
+  ```
+*/
 export fn memory_bank(options: object = null) -> object { return Memory.bank(options) }
+
+/**
+  Add an item to the short-term memory store.
+
+  Parameters:
+  - store: The short-term memory store object.
+  - item: The item to add to the store.
+
+  Returns:
+  - The added item.
+
+  Example:
+  ```sesi
+  let store = short_memory({"limit": 10})
+  let item = {"role": "user", "content": "Hello"}
+  let added = add_short(store, item)
+  ```
+
+  Output:
+  ```sesi
+  {"role": "user", "content": "Hello"}
+  ```
+*/
 export fn add_short(item, store: object) -> object { return Memory.add_short(store, item) }
+
+/**
+  Retrieve the most recent items from the short-term memory store.
+
+  Parameters:
+  - store: The short-term memory store object.
+  - limit: The maximum number of recent items to retrieve (default is 0, which means all items).
+
+  Returns:
+  - An array of the most recent items.
+
+  Example:
+  ```sesi
+  let store = short_memory({"limit": 10})
+  let recent_items = recent_memory(store, 5)
+  ```
+
+  Output:
+  ```sesi
+  [{"role": "user", "content": "Hello"}]
+  ```
+*/
 export fn recent_memory(store: object, limit: number = 0) -> array { return Memory.recent(store, limit) }
+
+/**
+  Clear all items from the short-term memory store.
+
+  Parameters:
+  - store: The short-term memory store object.
+
+  Returns:
+  - A boolean indicating whether the operation was successful.
+
+  Example:
+  ```sesi
+  let store = short_memory({"limit": 10})
+  let success = clear_short_memory(store)
+  ```
+
+  Output:
+  ```sesi
+  true
+  ```
+*/
 export fn clear_short_memory(store: object) -> bool { return Memory.clear_short(store) }
+
+/**
+  Add a memory record to the long-term memory store.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - content: The content of the memory record.
+  - metadata: Additional metadata for the memory record (default is null).
+  - id: The unique identifier for the memory record (default is an empty string, which generates a new ID).
+
+  Returns:
+  - The added memory record object.
+
+  Example:
+  ```sesi
+  let store = long_memory(".sesira/memory.db", "default")
+  let record = remember(store, "Hello world")
+  ```
+
+  Output:
+  ```sesi
+  {"id": "...", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}
+  ```
+*/
 export fn remember(content: string, store: object, metadata: object = null, id: string = "") -> object { return Memory.remember(store, content, metadata, id) }
+
+/**
+  Retrieve relevant memory records from the long-term memory store based on a query.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - query: The query string to search for relevant memory records.
+  - options: Additional options for the retrieval (default is null).
+
+  Returns:
+  - An array of relevant memory record objects.
+
+  Example:
+  ```sesi
+  let store = long_memory(".sesira/memory.db", "default")
+  let matches = recall(store, "Hello world")
+  ```
+
+  Output:
+  ```sesi
+  [{"id": "...", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}, ...]
+  ```
+*/
 export fn recall(query: string, store: object, options: object = null) -> array { return Memory.recall(store, query, options) }
+
+/**
+  Retrieve a memory record from the long-term memory store by its ID.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - id: The unique identifier of the memory record.
+
+  Returns:
+  - The memory record object if found, otherwise null.
+
+  Example:
+  ```sesi
+  let store = long_memory(".sesira/memory.db", "default")
+  let record = get_memory(store, "some_id")
+  ```
+
+  Output:
+  ```sesi
+  {"id": "some_id", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}
+  ```
+*/
 export fn get_memory(id: string, store: object) { return Memory.get(store, id) }
+
+/**
+  Retrieve all memory records from the long-term memory store.
+
+  Parameters:
+  - store: The long-term memory store object.
+  - limit: The maximum number of records to retrieve (default is 0, which retrieves all records).
+
+  Returns:
+  - An array of memory record objects.
+
+  Example:
+  ```sesi
+  let store = long_memory(".sesira/memory.db", "default")
+  let records = list_memory(store, 10)
+  ```
+
+  Output:
+  ```sesi
+  [{"id": "...", "content": "Hello world", "metadata": {}, "created_at": ..., "updated_at": ...}, ...]
+  ```
+*/
 export fn list_memory(store: object, limit: number = 0) -> array { return Memory.all(store, limit) }
+
 export fn forget(id: string, store: object) -> bool { return Memory.forget(store, id) }
+
+/**
+  Clear all memory records from the long-term memory store.
+
+  Parameters:
+  - store: The long-term memory store object.
+
+  Returns:
+  - The number of records deleted.
+
+  Example:
+  ```sesi
+  let store = long_memory(".sesira/memory.db", "default")
+  let deleted_count = clear_long_memory(store)
+  ```
+
+  Output:
+  ```sesi
+  10
+  ```
+*/
 export fn clear_long_memory(store: object) -> number { return Memory.clear_long(store) }
+
+/**
+  Retrieve relevant information from the application's memory based on a query.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - query: The query string to search for in the memory.
+  - options: An optional object containing additional options for the retrieval.
+
+  Returns:
+  - An object containing the recent and relevant memory entries, as well as the context.
+
+  Example:
+
+  ```sesi
+  let memory_result = retrieve(my_app, "What is the capital of France?", {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "recent": [...],
+    "relevant": [...],
+    "context": "The capital of France is Paris."
+  }
+  ```
+*/
 export fn retrieve(query: string, app: object, options: object = null) -> object { return Core.retrieve(app, query, options) }
+
+/**
+  Creates a document object with content, metadata, and an optional ID.
+
+  Parameters:
+  - `content`: The content of the document.
+  - `metadata`: The metadata associated with the document. Defaults to `null`.
+  - `id`: The ID of the document. Defaults to an empty string, which generates a unique ID.
+
+  Returns:
+  - A document object containing the content, metadata, and ID.
+
+  Example:
+  ```sesi
+  let doc = document("This is the content of the document.", {"author": "John Doe"})
+  ```
+
+  Output:
+  ```sesi
+  {"id": "doc_1", "content": "This is the content of the document.", "metadata": {"author": "John Doe"}}
+  ```
+*/
 export fn document(content: string, metadata: object = null, id: string = "") -> object { return Retrieval.document(content, metadata, id) }
+
+/**
+  Splits a document into smaller chunks based on the specified size and overlap.
+
+  Parameters:
+  - `doc`: The document object or content string to be chunked.
+  - `options`: An optional object containing chunking options:
+    - `size`: The maximum size of each chunk. Defaults to 1200.
+    - `overlap`: The number of overlapping characters between consecutive chunks. Defaults to 150.
+
+  Returns:
+  - An array of chunked document objects.
+
+  Example:
+  ```sesi
+  let chunks = chunk("This is a long document that needs to be split into smaller chunks.", {"size": 20, "overlap": 5})
+  ```
+
+  Output:
+  ```sesi
+  [
+    {"id": "doc_1_chunk_0", "content": "This is a long docu", "metadata": {"source_id": "doc_1", "chunk": 0, "start": 0, "end": 20}},
+    {"id": "doc_1_chunk_1", "content": "ment that needs to b", "metadata": {"source_id": "doc_1", "chunk": 1, "start": 15, "end": 35}},
+    {"id": "doc_1_chunk_2", "content": "e split into smaller", "metadata": {"source_id": "doc_1", "chunk": 2, "start": 30, "end": 50}},
+    {"id": "doc_1_chunk_3", "content": " chunks.", "metadata": {"source_id": "doc_1", "chunk": 3, "start": 45, "end": 57}}
+  ]
+  ```
+*/
 export fn chunk(document, options: object = null) -> array { return Retrieval.chunk(document, options) }
+
+/**
+  Searches for relevant documents based on a query string and optional filtering and scoring options.
+
+  Parameters:
+  - `documents`: An array of document objects to search within.
+  - `query`: The query string to match against the documents.
+  - `options`: An optional object containing search options:
+    - `limit`: The maximum number of results to return. Defaults to 5.
+    - `min_score`: The minimum relevance score for a document to be included. Defaults to 0.01.
+    - `filter`: An object specifying metadata filters to apply. Defaults to an empty object.
+    - `scorer`: A custom scoring function that takes a document and query and returns a relevance score. Defaults to `null`.
+
+  Returns:
+  - An array of document objects that match the query and filters, sorted by relevance score.
+
+  Example:
+  ```sesi
+  let documents = [document("This is a sample document.", {"author": "John Doe"})]
+  let results = search(documents, "sample", {"limit": 5, "min_score": 0.01})
+  ```
+
+  Output:
+  ```sesi
+  [{"id": "doc_1", "content": "This is a sample document.", "metadata": {"author": "John Doe"}, "score": 1}]
+  ```
+*/
 export fn search(documents: array, query: string, options: object = null) -> array { return Retrieval.search(documents, query, options) }
+
+/**
+  Generates a context string from an array of search results, respecting a maximum character limit.
+
+  Parameters:
+  - `results`: An array of search result objects.
+  - `options`: An optional object containing context generation options:
+    - `max_chars`: The maximum number of characters in the generated context. Defaults to 12000.
+
+  Returns:
+  - A string containing the context derived from the search results.
+
+  Example:
+  ```sesi
+  let context_str = context([{"id": "doc_1", "content": "This is a sample document.", "metadata": {"author": "John Doe"}, "score": 1}])
+  ```
+
+  Output:
+  ```sesi
+  "[Source 1 | score=1]
+  This is a sample document."
+  ```
+*/
 export fn context(results: array, options: object = null) -> string { return Retrieval.context(results, options) }
+
+/**
+  Index a list of documents into the application's memory, splitting them into chunks as needed.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - documents: An array of documents to be indexed.
+  - options: An optional object containing additional options for the indexing, such as chunking parameters.
+
+  Returns:
+  - The number of chunks successfully indexed into memory.
+
+  Example:
+
+  ```sesi
+  let documents = [document("Paris is the capital of France.", {"source": "encyclopedia"})]
+  let indexed_count = index_documents(documents, my_app, {"chunk_size": 100})
+  ```
+
+  Output:
+  ```sesi
+  1
+  ```
+*/
 export fn index_documents(documents: array, app: object, options: object = null) -> number { return Core.index_documents(app, documents, options) }
 
 // Workflows and observability
+
+/**
+  Define a workflow step with an ID, handler function, and optional configuration.
+
+  Parameters:
+  - id: The unique identifier for the workflow step.
+  - handler: The function to execute for this step.
+  - options: An object containing optional configuration for the step, including:
+    - depends_on: An array of step IDs that this step depends on (default is an empty array).
+    - when: A function that determines if the step should be executed (default is null).
+    - retries: The number of times to retry the step on failure (default is 0).
+    - on_error: The action to take on error, either "stop" or "continue" (default is "stop").
+
+  Returns:
+  - An object representing the workflow step.
+
+  Example:
+  ```sesi
+  let my_step = step("step1", debugCode, {"depends_on": ["step0"], "retries": 2})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "id": "step1",
+    "kind": "function",
+    "handler": debugCode,
+    "depends_on": ["step0"],
+    "when": null,
+    "retries": 2,
+    "on_error": "stop"
+  }
+  ```
+*/
 export fn step(id: string, handler, options: object = null) -> object { return Workflow.step(id, handler, options) }
+
+/**
+  Define a prompt workflow step with an ID, adapter, prompt text, and optional configuration.
+
+  Parameters:
+  - id: The unique identifier for the workflow step.
+  - adapter: The adapter object to use for the prompt.
+  - prompt_text: The text of the prompt to display.
+  - options: An object containing optional configuration for the step, including:
+    - model_options: An object containing model-specific options (default is an empty object).
+    - depends_on: An array of step IDs that this step depends on (default is an empty array).
+    - when: A function that determines if the step should be executed (default is null).
+    - retries: The number of times to retry the step on failure (default is 0).
+    - on_error: The action to take on error, either "stop" or "continue" (default is "stop").
+
+  Returns:
+  - An object representing the prompt workflow step.
+
+  Example:
+  ```sesi
+  let my_prompt_step = prompt_step("step2", myAdapter, "Enter your input:", {"depends_on": ["step1"], "retries": 1})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "id": "step2",
+    "kind": "prompt",
+    "adapter": myAdapter,
+    "prompt": "Enter your input:",
+    "model_options": {},
+    "depends_on": ["step1"],
+    "when": null,
+    "retries": 1,
+    "on_error": "stop"
+  }
+  ```
+*/
 export fn prompt_step(id: string, adapter: object, prompt_text: string, options: object = null) -> object { return Workflow.prompt_step(id, adapter, prompt_text, options) }
+
+/**
+  Run a workflow by executing its steps in order, respecting dependencies and conditions.
+
+  Parameters:
+  - steps: An array of workflow step objects.
+  - input: The initial input for the workflow.
+  - options: An object containing optional configuration for the workflow, including:
+    - observer: An observer object for monitoring workflow execution (default is a disabled observer).
+    - context: An object containing contextual information for the workflow (default is an empty object).
+
+  Returns:
+  - An object containing the final workflow state, including inputs, outputs, and execution order.
+
+  Example:
+  ```sesi
+  let final_state = run_workflow("initial input", my_workflow_steps, {"observer": myObserver, "context": {"user": "Alice"}})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "input": {"input_key": "input_value"},
+    "outputs": {
+      "step1": {"ok": true, "skipped": false, "value": "output1", "attempts": 1},
+      "step2": {"ok": true, "skipped": false, "value": "output2", "attempts": 1}
+    },
+    "order": ["step1", "step2"],
+    "context": {"user": "Alice"}
+  }
+  ```
+*/
 export fn run_workflow(input, steps: array, options: object = null) -> object { return Workflow.run(steps, input, options) }
+
+/**
+  Create a new observer for logging and tracing.
+
+  Parameters:
+  - options: An optional object containing observer configuration, including:
+    - path: The file path for JSONL logging.
+    - enabled: A boolean indicating if the observer is enabled.
+    - trace_id: An optional trace ID for the observer.
+
+  Returns:
+  - An observer object containing "enabled", "path", "trace_id", and "events".
+
+  Example:
+  ```sesi
+  let obs = observer({"path": "logs.jsonl", "enabled": true})
+  ```
+
+  Output:
+  ```sesi
+  {"enabled": true, "path": "logs.jsonl", "trace_id": "<some_trace_id>", "events": []}
+  ```
+*/
 export fn observer(options: object = null) -> object { return Observe.observer(options) }
+
+/**
+  Emit an event to the observer.
+
+  Parameters:
+  - target: The observer object.
+  - name: The name of the event.
+  - attributes: An optional object containing event attributes.
+
+  Returns:
+  - The emitted event object.
+
+  Example:
+  ```sesi
+  let obs = observer({"path": "logs.jsonl", "enabled": true})
+  let event = emit(obs, "user.login", {"user": "Alice"})
+  ```
+
+  Output:
+  ```sesi
+  {"name": "user.login", "timestamp": 0, "trace_id": "<some_trace_id>", "attributes": {"user": "Alice"}}
+  ```
+*/
 export fn emit(observer: object, name: string, attributes: object = null) -> object { return Observe.emit(observer, name, attributes) }
+
+/**
+  Start a new span for tracing.
+
+  Parameters:
+  - target: The observer object.
+  - name: The name of the span.
+  - attributes: An optional object containing span attributes.
+
+  Returns:
+  - The created span object.
+
+  Example:
+  ```sesi
+  let obs = observer({"path": "logs.jsonl", "enabled": true})
+  let span = start_span(obs, "database.query", {"query": "SELECT * FROM users"})
+  ```
+
+  Output:
+  ```sesi
+  {"id": "<some_span_id>", "name": "database.query", "started_at": 0, "attributes": {"query": "SELECT * FROM users"}}
+  ```
+*/
 export fn start_span(observer: object, name: string, attributes: object = null) -> object { return Observe.start_span(observer, name, attributes) }
+
+/**
+  End a span for tracing.
+
+  Parameters:
+  - target: The observer object.
+  - span: The span object to end.
+  - attributes: An optional object containing span attributes.
+
+  Returns:
+  - The span end event data object.
+
+  Example:
+  ```sesi
+  let obs = observer({"path": "logs.jsonl", "enabled": true})
+  let span = start_span(obs, "database.query", {"query": "SELECT * FROM users"})
+  let end_event = end_span(obs, span, {"rows": 10})
+  ```
+
+  Output:
+  ```sesi
+  {"span_id": "<some_span_id>", "span_name": "database.query", "duration_ms": 0, "attributes": {"rows": 10}}
+  ```
+*/
 export fn end_span(observer: object, span: object, attributes: object = null) -> object { return Observe.end_span(observer, span, attributes) }
+
+/**
+  Retrieve metrics from the observer.
+
+  Parameters:
+  - target: The observer object.
+
+  Returns:
+  - An object containing aggregated metrics such as event counts, errors, and total duration.
+
+  Example:
+  ```sesi
+  let obs = observer({"path": "logs.jsonl", "enabled": true})
+  let span = start_span(obs, "database.query", {"query": "SELECT * FROM users"})
+  end_span(obs, span, {"rows": 10})
+  let metrics_data = metrics(obs)
+  ```
+
+  Output:
+  ```sesi
+  {"trace_id": "<some_trace_id>", "events": 2, "errors": 0, "duration_ms": 0, "counts": {"span.start": 1, "span.end": 1}}
+  ```
+*/
 export fn metrics(observer: object) -> object { return Observe.metrics(observer) }
 
 // Configuration and discovery
+
+/**
+  Load the complete configuration by merging default values, values from a JSON file, environment variables, and optional overrides.
+
+  Parameters:
+  - path: The path to the JSON configuration file (default is "sesira.json").
+  - overrides: An object containing configuration values that should override other sources (default is null).
+
+  Returns:
+  - An object containing the final merged and validated configuration values.
+
+  Example:
+  ```sesi
+  let config = load_config("sesira.json", {"temperature": 0.5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "memory_path": ".sesira/memory.db",
+    "memory_namespace": "default",
+    "log_path": ".sesira/events.jsonl",
+    "temperature": 0.5,
+    "max_tokens": 4096
+  }
+  ```
+*/
 export fn load_config(path: string = "sesira.json", overrides: object = null) -> object { return Config.load(path, overrides) }
+
+/**
+  Redact sensitive information from the configuration object.
+
+  Parameters:
+  - config: The configuration object to redact.
+
+  Returns:
+  - A new configuration object with sensitive information replaced by `[redacted]`.
+
+  Example:
+  ```sesi
+  let config = {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "api_key": "my_secret_api_key",
+    "password": "my_secret_password"
+  }
+  let redacted_config = redact_config(config)
+  ```
+
+  Output:
+  ```sesi
+  {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "api_key": "[redacted]",
+    "password": "[redacted]"
+  }
+  ```
+*/
 export fn redact_config(config: object) -> object { return Config.redact(config) }
+
+/**
+  Returns an array of supported provider configurations, including their names, environment variable keys for API keys, and default models.
+
+  Returns:
+  - An array of objects representing the supported providers.
+
+  Output:
+  ```sesi
+  [
+    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.7-flash"},
+    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-5.6-terra"},
+    {"name": "local", "key_env": null, "default_model": "local"},
+    {"name": "sesi", "key_env": null, "default_model": "agent"},
+    {"name": "custom", "key_env": "provider-specific", "default_model": null}
+  ]
+  ```
+*/
 export fn supported_providers() -> array { return Providers.supported() }
+
+/**
+  Validates and parses JSON data against a given schema.
+  
+  Parameters:
+  - `value`: The JSON data to validate.
+  - `schema`: The JSON schema to validate against.
+  - `path`: The JSON path for error reporting. Defaults to "$".
+
+  Returns:
+  - An object containing:
+    - `valid`: A boolean indicating if the data is valid.
+    - `errors`: An array of error messages if the data is invalid.
+
+  Example:
+  ```sesi
+  let result = validate({"name": "John Doe"}, {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]})
+  ```
+
+  Output:
+  ```sesi
+  {"valid": true, "errors": []}
+  ```
+*/
 export fn validate(value, schema) -> object { return Schema.validate(value, schema) }

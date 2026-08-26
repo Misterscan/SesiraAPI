@@ -1,6 +1,27 @@
 /* Unified messages and prompt templates. */
 allow "utils" in as Utils
 
+/**
+  Create a message object with a specified role, content, and optional metadata.
+
+  Parameters:
+  - role: The role of the message (system, user, assistant, tool).
+  - content: The content of the message, either a string or an array of content parts.
+  - metadata: An optional object containing additional metadata for the message.
+
+  Returns:
+  - The created message object.
+
+  Example:
+  ```sesi
+  let msg = message("user", "Help me understand this topic", {"timestamp": 1234567890})
+  ```
+
+  Output:
+  ```sesi
+  {"role": "user", "content": "Help me understand this topic", "metadata": {"timestamp": 1234567890}}
+  ```
+*/
 export fn message(role: string, content, metadata: object = null) -> object {
   if metadata == null { metadata = {} }
   let allowed = ["system", "user", "assistant", "tool"]
@@ -17,18 +38,66 @@ export fn message(role: string, content, metadata: object = null) -> object {
   }
 }
 
+/**
+  Create a system message.
+
+  Parameters:
+  - content: The content of the system message.
+
+  Returns:
+  - The created system message object.
+*/
 export fn system(content: string) -> object {
   return message("system", content)
 }
 
+/**
+  Create a user message.
+
+  Parameters:
+  - content: The content of the user message.
+
+  Returns:
+  - The created user message object.
+*/
 export fn user(content) -> object {
   return message("user", content)
 }
 
+/**
+  Create an assistant message.
+
+  Parameters:
+  - content: The content of the assistant message.
+
+  Returns:
+  - The created assistant message object.
+*/
 export fn assistant(content) -> object {
   return message("assistant", content)
 }
 
+/**
+  Create a tool result message.
+
+  Parameters:
+  - name: The name of the tool.
+  - content: The content of the tool result message.
+  - call_id: An optional call ID associated with the tool result.
+
+  Returns:
+  - The created tool result message object.
+
+  Example:
+  ```sesi
+  let tool_msg = tool_result("image_generator", "Generated an image successfully", "call_123")
+  ```
+
+  Output:
+  ```sesi
+  {"role": "tool", "content": "Generated an image successfully", "metadata": {"tool": "image_generator"}, "name": "image_generator", "call_id": "call_123"}
+  ```
+*/
 export fn tool_result(name: string, content, call_id: string = "") -> object {
   let result = message("tool", content, {"tool": name})
   result["name"] = name
@@ -36,18 +105,95 @@ export fn tool_result(name: string, content, call_id: string = "") -> object {
   return result
 }
 
+/**
+  Create a text content part.
+
+  Parameters:
+  - text: The text content.
+
+  Returns:
+  - The created text content part object.
+
+  Example:
+  ```sesi
+  let text = text_part("Hello, world!")
+  ```
+
+  Output:
+  ```sesi
+  {"type": "text", "text": "Hello, world!"}
+  ```
+*/
 export fn text_part(text: string) -> object {
   return {"type": "text", "text": text}
 }
 
+/**
+  Create an image content part.
+
+  Parameters:
+  - path: The path to the image file.
+
+  Returns:
+  - The created image content part object.
+
+  Example:
+  ```sesi
+  let img = image_part("path/to/image.png")
+  ```
+
+  Output:
+  ```sesi
+  {"type": "image", "path": "path/to/image.png"}
+  ```
+*/
 export fn image_part(path: string) -> object {
   return {"type": "image", "path": path}
 }
 
+/**
+  Create an audio content part.
+
+  Parameters:
+  - path: The path to the audio file.
+
+  Returns:
+  - The created audio content part object.
+
+  Example:
+  ```sesi
+  let audio = audio_part("path/to/audio.mp3")
+  ```
+
+  Output:
+  ```sesi
+  {"type": "audio", "path": "path/to/audio.mp3"}
+  ```
+*/
 export fn audio_part(path: string) -> object {
   return {"type": "audio", "path": path}
 }
 
+/**
+  Extract the text content from a message content array.
+
+  Parameters:
+  - content: The message content, which can be a string or an array of content parts.
+
+  Returns:
+  - The extracted text content as a string.
+
+  Example:
+  ```sesi
+  let response = message("user", "You can extract text from the response.")
+  let text = content_text(response)
+  ```
+
+  Output:
+  ```sesi
+  "Extracted result."
+  ```
+*/
 export fn content_text(content) -> string {
   if type(content) == "string" { return content }
   if type(content) != "array" { return str(content) }
@@ -66,6 +212,25 @@ export fn content_text(content) -> string {
   return text
 }
 
+/**
+  Normalize the input into an array of message objects.
+
+  Parameters:
+  - input: The input to normalize, which can be a string, a message object, or an array of messages.
+
+  Returns:
+  - An array of normalized message objects.
+
+  Example:
+  ```sesi
+  let normalized = normalize("Hello, world!")
+  ```
+
+  Output:
+  ```sesi
+  [{"role": "user", "content": "Hello, world!"}]
+  ```
+*/
 export fn normalize(input) -> array {
   if type(input) == "string" { return [user(input)] }
   if type(input) == "object" {
@@ -87,6 +252,26 @@ export fn normalize(input) -> array {
   return []
 }
 
+/**
+  Render an array of messages into a string representation.
+
+  Parameters:
+  - messages: The array of messages to render.
+
+  Returns:
+  - A string representation of the messages.
+
+  Example:
+  ```sesi
+  let rendered = render([user("Hello, world!"), assistant("Hi there!")])
+  ```
+
+  Output:
+  ```sesi
+  "USER: Hello, world!
+  ASSISTANT: Hi there!"
+  ```
+*/
 export fn render(messages) -> string {
   let result = ""
   for item in normalize(messages) {
@@ -96,6 +281,31 @@ export fn render(messages) -> string {
   return result
 }
 
+/**
+  Extract the text content from system messages.
+
+  Parameters:
+  - messages: The array of messages to extract from.
+
+  Returns:
+  - A string containing the concatenated text of all system messages.
+
+  Example:
+  ```sesi
+  let systemMessages = [
+    system("System message 1"),
+    user("User message"),
+    system("System message 2")
+  ]
+  let text = system_text(systemMessages)
+  ```
+  Output:
+  ```sesi
+  "System message 1
+
+  System message 2"
+  ```
+*/
 export fn system_text(messages) -> string {
   let result = ""
   for item in normalize(messages) {
@@ -107,6 +317,28 @@ export fn system_text(messages) -> string {
   return result
 }
 
+/**
+  Remove all system messages from the array of messages.
+
+  Parameters:
+  - messages: The array of messages to filter.
+
+  Returns:
+  - An array of messages excluding system messages.
+
+  Example:
+  ```sesi
+  let messages = [
+    system("System message"),
+    user("User message")
+  ]
+  let filtered = without_system(messages)
+  ```
+  Output:
+  ```sesi
+  [{"role": "user", "content": "User message"}]
+  ```
+*/
 export fn without_system(messages) -> array {
   let result = []
   for item in normalize(messages) {
@@ -115,6 +347,27 @@ export fn without_system(messages) -> array {
   return result
 }
 
+/**
+  Render a template string by replacing placeholders with values from an object.
+
+  Parameters:
+  - text: The template string containing placeholders in the form {{key}}.
+  - values: An object containing the values to replace the placeholders with.
+
+  Returns:
+  - The rendered string with all placeholders replaced by their corresponding values.
+
+  Example:
+  ```sesi
+  let text = "Hello, {{name}}!"
+  let values = {"name": "World"}
+  let rendered = template(text, values)
+  ```
+  Output:
+  ```sesi
+  "Hello, World!"
+  ```
+*/
 export fn template(text: string, values: object) -> string {
   let result = text
   for key in keys(values) {
@@ -130,6 +383,30 @@ export fn template(text: string, values: object) -> string {
   return result
 }
 
-export fn estimate(messages, model_name: string = "gemini-3.6-flash") -> number {
+/**
+  Estimate the number of tokens in an array of messages for a given model.
+
+  Parameters:
+  - messages: The array of messages to estimate tokens for.
+  - model_name: The name of the model to use for token estimation (default is "gemini-3.7-flash").
+
+  Returns:
+  - The estimated number of tokens.
+
+  Example:
+  ```sesi
+  let messages = [
+    user("Hello, world!"),
+    assistant("Hi there!")
+  ]
+  let token_count = estimate(messages)
+  ```
+  
+  Output:
+  ```sesi
+  10
+  ```
+*/
+export fn estimate(messages, model_name: string = "gemini-3.7-flash") -> number {
   return estimate_tokens(render(messages), model_name)
 }

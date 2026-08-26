@@ -1,14 +1,23 @@
 /* Dependency-free document chunking and lexical retrieval. */
 allow "utils" in as Utils
 
+// Non-empty check function.
+//
+// Returns: `true` if the value is non-empty after converting it to a string and trimming whitespace, `false` otherwise.
 fn non_empty(value) -> any {
   return trim(str(value)) != ""
 }
 
+// Score comparison function for sorting search results in descending order of relevance.
+//
+// Returns: a positive number if `b` is more relevant than `a`, a negative number if `a` is more relevant than `b`, and 0 if they have equal relevance.
 fn score_desc(a, b) -> number {
   return b["score"] - a["score"]
 }
 
+// Checks if the metadata of a document matches the desired key-value pairs.
+//
+// Returns: `true` if all key-value pairs in `wanted` are present and equal in `metadata`, `false` otherwise.
 fn metadata_matches(metadata, wanted) -> bool {
   if wanted == null || len(keys(wanted)) == 0 { return true }
   if metadata == null { return false }
@@ -18,6 +27,25 @@ fn metadata_matches(metadata, wanted) -> bool {
   return true
 }
 
+/**
+  Checks if a value is non-empty after converting it to a string and trimming whitespace.
+
+  Parameters:
+  - `value`: The value to check.
+
+  Returns:
+  - `true` if the value is non-empty, `false` otherwise.
+
+  Example:
+  ```sesi
+  let is_non_empty = non_empty("value")
+  ```
+
+  Output:
+  ```sesi
+  true
+  ```
+*/
 export fn terms(text: string) -> array {
   let normalized = to_lower(text)
   normalized = regex("[^a-z0-9]+", normalized, {
@@ -28,6 +56,26 @@ export fn terms(text: string) -> array {
   return unique(filter(split(trim(normalized), " "), non_empty))
 }
 
+/**
+  Computes a relevance score between a content string and a query string based on term coverage and phrase matching.
+
+  Parameters:
+  - `content`: The content string to be scored.
+  - `query`: The query string to compare against the content.
+
+  Returns:
+  - A relevance score between 0 and 1.
+
+  Example:
+  ```sesi
+  let relevance = score("This is a sample content.", "sample content")
+  ```
+
+  Output:
+  ```sesi
+  1
+  ```
+*/
 export fn score(content: string, query: string) -> number {
   let query_terms = terms(query)
   let content_terms = terms(content)
@@ -42,12 +90,60 @@ export fn score(content: string, query: string) -> number {
   return Utils.clamp(coverage + phrase_bonus, 0, 1)
 }
 
+/**
+  Creates a document object with content, metadata, and an optional ID.
+
+  Parameters:
+  - `content`: The content of the document.
+  - `metadata`: The metadata associated with the document. Defaults to `null`.
+  - `id`: The ID of the document. Defaults to an empty string, which generates a unique ID.
+
+  Returns:
+  - A document object containing the content, metadata, and ID.
+
+  Example:
+  ```sesi
+  let doc = document("This is the content of the document.", {"author": "John Doe"})
+  ```
+
+  Output:
+  ```sesi
+  {"id": "doc_1", "content": "This is the content of the document.", "metadata": {"author": "John Doe"}}
+  ```
+*/
 export fn document(content: string, metadata: object = null, id: string = "") -> object {
   if metadata == null { metadata = {} }
   if id == "" { id = Utils.make_id("doc") }
   return {"id": id, "content": content, "metadata": metadata}
 }
 
+/**
+  Splits a document into smaller chunks based on the specified size and overlap.
+
+  Parameters:
+  - `doc`: The document object or content string to be chunked.
+  - `options`: An optional object containing chunking options:
+    - `size`: The maximum size of each chunk. Defaults to 1200.
+    - `overlap`: The number of overlapping characters between consecutive chunks. Defaults to 150.
+
+  Returns:
+  - An array of chunked document objects.
+
+  Example:
+  ```sesi
+  let chunks = chunk("This is a long document that needs to be split into smaller chunks.", {"size": 20, "overlap": 5})
+  ```
+
+  Output:
+  ```sesi
+  [
+    {"id": "doc_1_chunk_0", "content": "This is a long docu", "metadata": {"source_id": "doc_1", "chunk": 0, "start": 0, "end": 20}},
+    {"id": "doc_1_chunk_1", "content": "ment that needs to b", "metadata": {"source_id": "doc_1", "chunk": 1, "start": 15, "end": 35}},
+    {"id": "doc_1_chunk_2", "content": "e split into smaller", "metadata": {"source_id": "doc_1", "chunk": 2, "start": 30, "end": 50}},
+    {"id": "doc_1_chunk_3", "content": " chunks.", "metadata": {"source_id": "doc_1", "chunk": 3, "start": 45, "end": 57}}
+  ]
+  ```
+*/
 export fn chunk(doc, options: object = null) -> array {
   let source = doc
   if type(doc) == "string" { source = document(doc) }
@@ -78,6 +174,32 @@ export fn chunk(doc, options: object = null) -> array {
   return chunks
 }
 
+/**
+  Searches for relevant documents based on a query string and optional filtering and scoring options.
+
+  Parameters:
+  - `documents`: An array of document objects to search within.
+  - `query`: The query string to match against the documents.
+  - `options`: An optional object containing search options:
+    - `limit`: The maximum number of results to return. Defaults to 5.
+    - `min_score`: The minimum relevance score for a document to be included. Defaults to 0.01.
+    - `filter`: An object specifying metadata filters to apply. Defaults to an empty object.
+    - `scorer`: A custom scoring function that takes a document and query and returns a relevance score. Defaults to `null`.
+
+  Returns:
+  - An array of document objects that match the query and filters, sorted by relevance score.
+
+  Example:
+  ```sesi
+  let documents = [document("This is a sample document.", {"author": "John Doe"})]
+  let results = search(documents, "sample", {"limit": 5, "min_score": 0.01})
+  ```
+
+  Output:
+  ```sesi
+  [{"id": "doc_1", "content": "This is a sample document.", "metadata": {"author": "John Doe"}, "score": 1}]
+  ```
+*/
 export fn search(documents: array, query: string, options: object = null) -> array {
   let limit = Utils.pick(options, "limit", 5)
   let min_score = Utils.pick(options, "min_score", 0.01)
@@ -100,6 +222,28 @@ export fn search(documents: array, query: string, options: object = null) -> arr
   return results
 }
 
+/**
+  Generates a context string from an array of search results, respecting a maximum character limit.
+
+  Parameters:
+  - `results`: An array of search result objects.
+  - `options`: An optional object containing context generation options:
+    - `max_chars`: The maximum number of characters in the generated context. Defaults to 12000.
+
+  Returns:
+  - A string containing the context derived from the search results.
+
+  Example:
+  ```sesi
+  let context_str = context([{"id": "doc_1", "content": "This is a sample document.", "metadata": {"author": "John Doe"}, "score": 1}])
+  ```
+
+  Output:
+  ```sesi
+  "[Source 1 | score=1]
+  This is a sample document."
+  ```
+*/
 export fn context(results: array, options: object = null) -> string {
   let max_chars = Utils.pick(options, "max_chars", 12000)
   let output = ""
@@ -113,6 +257,33 @@ export fn context(results: array, options: object = null) -> string {
   return trim(output)
 }
 
+/**
+  Generates an answer prompt string using a question and an array of search results.
+
+  Parameters:
+  - `question`: The question string to be answered.
+  - `results`: An array of search result objects to be used as context.
+
+  Returns:
+  - A string containing the answer prompt with the context and question.
+
+  Example:
+  ```sesi
+  let results = [{"id": "doc_1", "content": "This is a sample document.", "metadata": {"author": "John Doe"}, "score": 1}]
+  let p = answer_prompt("What is the content of the document?", results)
+  ```
+
+  Output:
+  ```sesi
+  "Answer the question using the retrieved context. If the context does not support an answer, say so.
+
+  Context:
+  [Source 1 | score=1]
+  This is a sample document.
+
+  Question: What is the content of the document?""
+  ```
+*/
 export fn answer_prompt(question: string, results: array) -> string {
   return "Answer the question using the retrieved context. If the context does not support an answer, say so.\n\nContext:\n" + context(results) + "\n\nQuestion: " + question
 }

@@ -11,5 +11,5 @@ let app = {
 } | Sesira.create
 
 let response = "How do I reset my password?" | Sesira.chat(app)
-show response["text"]
-show "Tokens:" response["usage"]["total_tokens"]
+show response.text
+show "Tokens:" response.usage.total_tokens

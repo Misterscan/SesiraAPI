@@ -4,6 +4,39 @@ allow "providers" in as Providers
 allow "messages" in as Messages
 allow "observability" in as Observe
 
+/**
+  Define a workflow step with an ID, handler function, and optional configuration.
+
+  Parameters:
+  - id: The unique identifier for the workflow step.
+  - handler: The function to execute for this step.
+  - options: An object containing optional configuration for the step, including:
+    - depends_on: An array of step IDs that this step depends on (default is an empty array).
+    - when: A function that determines if the step should be executed (default is null).
+    - retries: The number of times to retry the step on failure (default is 0).
+    - on_error: The action to take on error, either "stop" or "continue" (default is "stop").
+
+  Returns:
+  - An object representing the workflow step.
+
+  Example:
+  ```sesi
+  let my_step = step("step1", debugCode, {"depends_on": ["step0"], "retries": 2})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "id": "step1",
+    "kind": "function",
+    "handler": debugCode,
+    "depends_on": ["step0"],
+    "when": null,
+    "retries": 2,
+    "on_error": "stop"
+  }
+  ```
+*/
 export fn step(id: string, handler, options: object = null) -> object {
   return {
     "id": id,
@@ -16,6 +49,43 @@ export fn step(id: string, handler, options: object = null) -> object {
   }
 }
 
+/**
+  Define a prompt workflow step with an ID, adapter, prompt text, and optional configuration.
+
+  Parameters:
+  - id: The unique identifier for the workflow step.
+  - adapter: The adapter object to use for the prompt.
+  - prompt_text: The text of the prompt to display.
+  - options: An object containing optional configuration for the step, including:
+    - model_options: An object containing model-specific options (default is an empty object).
+    - depends_on: An array of step IDs that this step depends on (default is an empty array).
+    - when: A function that determines if the step should be executed (default is null).
+    - retries: The number of times to retry the step on failure (default is 0).
+    - on_error: The action to take on error, either "stop" or "continue" (default is "stop").
+
+  Returns:
+  - An object representing the prompt workflow step.
+
+  Example:
+  ```sesi
+  let my_prompt_step = prompt_step("step2", myAdapter, "Enter your input:", {"depends_on": ["step1"], "retries": 1})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "id": "step2",
+    "kind": "prompt",
+    "adapter": myAdapter,
+    "prompt": "Enter your input:",
+    "model_options": {},
+    "depends_on": ["step1"],
+    "when": null,
+    "retries": 1,
+    "on_error": "stop"
+  }
+  ```
+*/
 export fn prompt_step(id: string, adapter: object, prompt_text: string, options: object = null) -> object {
   return {
     "id": id,
@@ -30,6 +100,16 @@ export fn prompt_step(id: string, adapter: object, prompt_text: string, options:
   }
 }
 
+/**
+  Check if all dependencies for a workflow step are ready based on the current outputs.
+
+  Parameters:
+  - item: The workflow step object.
+  - outputs: An object containing the outputs of completed steps.
+
+  Returns:
+  - A boolean indicating whether all dependencies are ready.
+*/
 fn dependencies_ready(item: object, outputs: object) -> bool {
   for dependency in item["depends_on"] {
     if !includes(keys(outputs), dependency) { return false }
@@ -37,6 +117,16 @@ fn dependencies_ready(item: object, outputs: object) -> bool {
   return true
 }
 
+/**
+  Generate the payload for a workflow step based on its dependencies and the current state.
+
+  Parameters:
+  - item: The workflow step object.
+  - state: The current workflow state, including inputs and outputs.
+
+  Returns:
+  - The payload for the workflow step, which can be the input, a single dependency's output, or an object containing multiple dependencies' outputs.
+*/
 fn payload_for(item: object, state: object) {
   let dependencies = item["depends_on"]
   if len(dependencies) == 0 { return state["input"] }
@@ -48,6 +138,16 @@ fn payload_for(item: object, state: object) {
   return values
 }
 
+/**
+  Execute a workflow step based on its kind and the current state.
+
+  Parameters:
+  - item: The workflow step object.
+  - state: The current workflow state, including inputs and outputs.
+
+  Returns:
+  - The result of executing the workflow step, which can be the output of a function step or the completed prompt text.
+*/
 fn execute_step(item: object, state: object) {
   let payload = payload_for(item, state)
   if item["kind"] == "function" {
@@ -61,6 +161,37 @@ fn execute_step(item: object, state: object) {
   return Providers.complete(item["adapter"], rendered, item["model_options"])["text"]
 }
 
+/**
+  Run a workflow by executing its steps in order, respecting dependencies and conditions.
+
+  Parameters:
+  - steps: An array of workflow step objects.
+  - input: The initial input for the workflow.
+  - options: An object containing optional configuration for the workflow, including:
+    - observer: An observer object for monitoring workflow execution (default is a disabled observer).
+    - context: An object containing contextual information for the workflow (default is an empty object).
+
+  Returns:
+  - An object containing the final workflow state, including inputs, outputs, and execution order.
+
+  Example:
+  ```sesi
+  let final_state = run(my_workflow_steps, "initial input", {"observer": myObserver, "context": {"user": "Alice"}})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "input": "initial input",
+    "outputs": {
+      "step1": {"ok": true, "skipped": false, "value": "output1", "attempts": 1},
+      "step2": {"ok": true, "skipped": false, "value": "output2", "attempts": 1}
+    },
+    "order": ["step1", "step2"],
+    "context": {"user": "Alice"}
+  }
+  ```
+*/
 export fn run(steps: array, input, options: object = null) -> object {
   let step_ids = []
   for item in steps {

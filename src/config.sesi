@@ -1,10 +1,38 @@
 /* Configuration from defaults, JSON files, environment, and explicit overrides. */
 allow "utils" in as Utils
 
+/**
+  Default configuration values for the Sesi assistant.
+
+  Returns:
+  - An object containing the default configuration values.
+
+  Output:
+  ```sesi
+  {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "system": "You are a helpful Sesi assistant.",
+    "temperature": 0.2,
+    "max_tokens": 4096,
+    "thinking": "low",
+    "search": false,
+    "cache": true,
+    "stream": false,
+    "short_memory_limit": 20,
+    "memory_path": ".sesira/memory.db",
+    "memory_namespace": "default",
+    "retrieval_limit": 5,
+    "max_agent_steps": 8,
+    "log_path": ".sesira/events.jsonl",
+    "observability": true
+  }
+  ```
+*/
 export fn defaults() -> object {
   return {
     "provider": "gemini",
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.7-flash",
     "system": "You are a helpful Sesi assistant.",
     "temperature": 0.2,
     "max_tokens": 4096,
@@ -22,6 +50,25 @@ export fn defaults() -> object {
   }
 }
 
+/**
+  Load configuration values from environment variables.
+
+  Returns:
+  - An object containing configuration values obtained from environment variables.
+
+  Output:
+  ```sesi
+  {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "memory_path": ".sesira/memory.db",
+    "memory_namespace": "default",
+    "log_path": ".sesira/events.jsonl",
+    "temperature": 0.2,
+    "max_tokens": 4096
+  }
+  ```
+*/
 export fn from_env() -> object {
   let result = {}
   let provider = env("SESIRA_PROVIDER")
@@ -41,6 +88,33 @@ export fn from_env() -> object {
   return result
 }
 
+/**
+  Read configuration values from a JSON file.
+
+  Parameters:
+  - path: The path to the JSON configuration file (default is "sesira.json").
+
+  Returns:
+  - An object containing the configuration values read from the file.
+
+  Example:
+  ```sesi
+  let config = read("sesira.json")
+  ```
+
+  Output:
+  ```sesi
+  {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "memory_path": ".sesira/memory.db",
+    "memory_namespace": "default",
+    "log_path": ".sesira/events.jsonl",
+    "temperature": 0.2,
+    "max_tokens": 4096
+  }
+  ```
+*/
 export fn read(path: string = "sesira.json") -> object {
   let content = null
   try {
@@ -63,6 +137,34 @@ export fn read(path: string = "sesira.json") -> object {
   return parsed
 }
 
+/**
+  Load the complete configuration by merging default values, values from a JSON file, environment variables, and optional overrides.
+
+  Parameters:
+  - path: The path to the JSON configuration file (default is "sesira.json").
+  - overrides: An object containing configuration values that should override other sources (default is null).
+
+  Returns:
+  - An object containing the final merged and validated configuration values.
+
+  Example:
+  ```sesi
+  let config = load("sesira.json", {"temperature": 0.5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "memory_path": ".sesira/memory.db",
+    "memory_namespace": "default",
+    "log_path": ".sesira/events.jsonl",
+    "temperature": 0.5,
+    "max_tokens": 4096
+  }
+  ```
+*/
 export fn load(path: string = "sesira.json", overrides: object = null) -> object {
   let config = defaults()
   config = Utils.merge(config, read(path))
@@ -71,6 +173,18 @@ export fn load(path: string = "sesira.json", overrides: object = null) -> object
   return validate(config)
 }
 
+/**
+  Validate the configuration object to ensure required fields are present and have valid values.
+
+  Parameters:
+  - config: The configuration object to validate.
+
+  Returns:
+  - The validated configuration object.
+
+  Raises:
+  - ConfigurationError if any required field is missing or has an invalid value.
+*/
 export fn validate(config: object) -> object {
   if config["provider"] == null || trim(str(config["provider"])) == "" {
     raise_error("ConfigurationError", "provider is required", null)
@@ -87,6 +201,36 @@ export fn validate(config: object) -> object {
   return config
 }
 
+/**
+  Redact sensitive information from the configuration object.
+
+  Parameters:
+  - config: The configuration object to redact.
+
+  Returns:
+  - A new configuration object with sensitive information replaced by `[redacted]`.
+
+  Example:
+  ```sesi
+  let config = {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "api_key": "my_secret_api_key",
+    "password": "my_secret_password"
+  }
+  let redacted_config = redact(config)
+  ```
+
+  Output:
+  ```sesi
+  {
+    "provider": "gemini",
+    "model": "gemini-3.7-flash",
+    "api_key": "[redacted]",
+    "password": "[redacted]"
+  }
+  ```
+*/
 export fn redact(config: object) -> object {
   let result = Utils.copy_object(config)
   let secrets = ["api_key", "token", "password", "secret"]

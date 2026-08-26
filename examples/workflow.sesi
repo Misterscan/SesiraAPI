@@ -17,4 +17,4 @@ let steps = [
 ]
 
 let result = "  AI-powered garden planner  " | Sesira.run_workflow(steps)
-show result["final"]
+show result.final

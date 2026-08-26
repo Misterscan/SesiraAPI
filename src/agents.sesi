@@ -5,6 +5,39 @@ allow "tools" in as Tools
 allow "memory" in as Memory
 allow "observability" in as Observe
 
+/**
+  Create a new autonomous ReAct-style agent with validated tool execution.
+
+  Parameters:
+  - app: The application object containing configuration and resources.
+  - options: An object containing optional configuration for the agent, including:
+    - name: The name of the agent (default is "sesira-agent").
+    - system: The system prompt for the agent (default is a careful Sesi agent description).
+    - tools: An array of tools available to the agent (default is an empty array).
+    - max_steps: The maximum number of steps the agent can take (default is from app config).
+    - temperature: The temperature for the agent's decision-making (default is 0.1).
+
+  Returns:
+  - An object representing the created agent with its configuration and resources.
+
+  Example:
+
+  ```sesi
+  let my_agent = create(my_app, {"name": "example-agent", "tools": [my_tool]})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "name": "example-agent",
+    "app": my_app,
+    "system": "You are an autonomous, careful Sesi agent. Use tools only when they help and finish with a direct answer.",
+    "tools": [my_tool],
+    "max_steps": my_app["config"]["max_agent_steps"],
+    "temperature": 0.1
+  }
+  ```
+*/
 export fn create(app: object, options: object = null) -> object {
   return {
     "name": Utils.pick(options, "name", "sesira-agent"),
@@ -16,6 +49,12 @@ export fn create(app: object, options: object = null) -> object {
   }
 }
 
+/**
+  Define the schema for a single step in the agent's decision-making process.
+
+  Returns:
+  - An object representing the JSON schema for a step, including required properties and their types.
+*/
 fn step_schema() -> object {
   return {
     "type": "object",
@@ -31,6 +70,34 @@ fn step_schema() -> object {
   }
 }
 
+/**
+  Run the agent on a given task, executing steps until a final answer is produced or the maximum number of steps is reached.
+
+  Parameters:
+  - agent: The agent object created by the `create` function.
+  - task: The task string that the agent should work on.
+  - options: An object containing optional configuration for the run, including:
+    - max_steps: The maximum number of steps to execute (default is the agent's max_steps).
+
+  Returns:
+  - An object containing the final answer, the sequence of steps taken, and the step count.
+
+  Example:
+
+  ```sesi
+  let result = run(my_agent, "Solve this task", {"max_steps": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "ok": true,
+    "final": "The final answer",
+    "steps": [...],
+    "step_count": 3
+  }
+  ```
+*/
 export fn run(agent: object, task: string, options: object = null) -> object {
   let app = agent["app"]
   let observer = app["observer"]

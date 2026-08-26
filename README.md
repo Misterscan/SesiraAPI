@@ -24,7 +24,7 @@ let config = {
 let app = config | Sesira.create
 
 let answer = "Draft a launch checklist." | Sesira.ask(app)
-print answer
+show answer
 ```
 
 Run the native test suite:
@@ -102,10 +102,10 @@ Recognized environment overrides include `SESIRA_PROVIDER`, `SESIRA_MODEL`, `SES
 ## Streaming
 
 ```sesi
-fn on_chunk(chunk) { print chunk }
+fn on_chunk(chunk) { show chunk }
 
 let result = "Explain the design." | Sesira.stream(app, on_chunk)
-print result["usage"]
+show result.usage
 ```
 
 ## Structured output
@@ -161,7 +161,7 @@ For RAG, index documents into the application memory and chat normally:
 ```sesi
 let docs = [Sesira.document(read_file("handbook.md"), {"source": "handbook"}, "handbook")]
 docs | Sesira.index_documents(app, {"size": 1200, "overlap": 150})
-print "What is the refund window?" | Sesira.ask(app)
+show "What is the refund window?" | Sesira.ask(app)
 ```
 
 ## Workflows

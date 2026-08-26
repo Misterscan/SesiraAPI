@@ -2,6 +2,19 @@
 allow "utils" in as Utils
 allow "providers" in as Providers
 
+/**
+  Validates and parses JSON data against a given schema.
+
+  Parameters:
+  - `value`: The JSON data to validate.
+  - `schema`: The JSON schema to validate against.
+  - `path`: The JSON path for error reporting. Defaults to "$".
+
+  Returns:
+  - An object containing:
+    - `valid`: A boolean indicating if the data is valid.
+    - `errors`: An array of error messages if the data is invalid.
+*/
 fn validate_type(value, expected: string, path: string) -> array {
   let errors = []
   let actual = type(value)
@@ -21,6 +34,29 @@ fn validate_type(value, expected: string, path: string) -> array {
   return errors
 }
 
+/**
+  Validates and parses JSON data against a given schema.
+  
+  Parameters:
+  - `value`: The JSON data to validate.
+  - `schema`: The JSON schema to validate against.
+  - `path`: The JSON path for error reporting. Defaults to "$".
+
+  Returns:
+  - An object containing:
+    - `valid`: A boolean indicating if the data is valid.
+    - `errors`: An array of error messages if the data is invalid.
+
+  Example:
+  ```sesi
+  let result = validate({"name": "John Doe"}, {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]})
+  ```
+
+  Output:
+  ```sesi
+  {"valid": true, "errors": []}
+  ```
+*/
 export fn validate(value, schema, path: string = "$") -> object {
   let errors = []
   if type(schema) == "string" {
@@ -87,6 +123,27 @@ export fn validate(value, schema, path: string = "$") -> object {
   return {"valid": len(errors) == 0, "errors": errors}
 }
 
+/**
+  Validate a JSON value against a JSON Schema.
+
+  Parameters:
+  - text: The JSON text to be parsed.
+  - schema: The JSON Schema to validate against.
+
+  Returns:
+  - The parsed JSON value if it is valid according to the schema.
+  - Raises an error if the JSON is invalid or does not match the schema.
+
+  Example:
+  ```sesi
+  let value = parse('{"name": "John Doe"}', {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]})
+  ```
+
+  Output:
+  ```sesi
+  "John Doe"
+  ``` 
+*/
 export fn parse(text: string, schema) {
   let value = null
   try {
@@ -101,6 +158,30 @@ export fn parse(text: string, schema) {
   return value
 }
 
+/**
+  Generate a JSON value using a language model and validate it against a JSON Schema.
+
+  Parameters:
+  - adapter: The language model adapter to use for generation.
+  - prompt_text: The prompt text to guide the generation.
+  - schema: The JSON Schema to validate the generated output against.
+  - options: Optional generation options.
+
+  Returns:
+  - The generated JSON value if it is valid according to the schema.
+  - Raises an error if the generated JSON is invalid or does not match the schema.
+
+  Example:
+  ```sesi
+  let config = from_config({"provider": "openai", "temperature": 0.5})
+  let value = generate(config, "Generate a person object", {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]})
+  ```
+
+  Output:
+  ```sesi
+  {"name": "John Doe"}
+  ```
+*/
 export fn generate(adapter: object, prompt_text: string, schema, options: object = null) {
   let schema_text = Utils.safe_json(schema)
   let request = prompt_text + "\n\nReturn only valid JSON. It must match this JSON Schema exactly:\n" + schema_text

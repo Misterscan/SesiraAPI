@@ -3,7 +3,7 @@
 Run the CLI directly with Sesi:
 
 ```bash
-sesi --cli -l SesiraAPI/cli.sesi <command>
+sesi -l SesiraAPI/cli.sesi <command>
 ```
 
 - `init [--force]` creates `sesira.json` and `app.sesi`. Existing files are preserved unless forced.

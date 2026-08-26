@@ -8,6 +8,33 @@ allow "retrieval" in as Retrieval
 allow "schema" in as Schema
 allow "observability" in as Observe
 
+/**
+  Create a new Sesira application runtime with chat, streaming, memory, retrieval, and observability capabilities.
+
+  Parameters:
+  - overrides: An object containing optional configuration overrides for the application, including:
+    - config_path: The path to the configuration file (default is "sesira.json").
+
+  Returns:
+  - An object representing the created application with its configuration, provider, memory store, and observer.
+
+  Example:
+
+  ```sesi
+  let my_app = create({"config_path": "sesira.json"})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "name": "sesira-app",
+    "config": {...},
+    "provider": {...},
+    "memory": {...},
+    "observer": {...}
+  }
+  ```
+*/
 export fn create(overrides: object = null) -> object {
   let path = Utils.pick(overrides, "config_path", "sesira.json")
   let config = Config.load(path, overrides)
@@ -40,6 +67,15 @@ export fn create(overrides: object = null) -> object {
   return app
 }
 
+/**
+  Get the last user message text from a list of messages.
+
+  Parameters:
+  - messages: An array of message objects.
+
+  Returns:
+  - The text content of the last user message, or an empty string if none exists.
+*/
 fn last_user_text(messages: array) -> string {
   let result = ""
   for item in messages {
@@ -48,6 +84,15 @@ fn last_user_text(messages: array) -> string {
   return result
 }
 
+/**
+  Get the recent prompt text from the short-term memory store.
+
+  Parameters:
+  - memory_store: The memory store object containing short-term memory.
+
+  Returns:
+  - A string representing the recent prompt text, including roles and content of recent messages.
+*/
 fn recent_prompt(memory_store) -> string {
   if memory_store == null { return "" }
   let output = ""
@@ -57,6 +102,15 @@ fn recent_prompt(memory_store) -> string {
   return output
 }
 
+/**
+  Extract image paths from a list of messages.
+
+  Parameters:
+  - messages: An array of message objects.
+
+  Returns:
+  - An array of strings representing the paths of images found in the messages.
+*/
 fn image_paths(messages: array) -> array {
   let paths = []
   for item in messages {
@@ -69,6 +123,32 @@ fn image_paths(messages: array) -> array {
   return paths
 }
 
+/**
+  Perform a chat interaction with the application, sending user input and receiving a response.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - input: The user input message(s) to be processed.
+  - options: An optional object containing additional options for the chat, such as retrieval limits and streaming callbacks.
+
+  Returns:
+  - An object representing the chat response, including the generated text, retrieval context, and usage information.
+
+  Example:
+
+  ```sesi
+  let response = chat(my_app, "Hello, how are you?", {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "text": "I'm doing well, thank you!",
+    "retrieval": [...],
+    "usage": {...}
+  }
+  ```
+*/
 export fn chat(app: object, input, options: object = null) -> object {
   let messages = Messages.normalize(input)
   let question = last_user_text(messages)
@@ -113,16 +193,92 @@ export fn chat(app: object, input, options: object = null) -> object {
   return null
 }
 
+/**
+  Ask the application a question and receive a text response.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - input: The user input message(s) to be processed.
+  - options: An optional object containing additional options for the chat, such as retrieval limits and streaming callbacks.
+
+  Returns:
+  - A string representing the generated response text from the application.
+
+  Example:
+
+  ```sesi
+  let answer = ask(my_app, "What is the capital of France?", {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  "The capital of France is Paris."
+  ```
+*/
 export fn ask(app: object, input, options: object = null) -> string {
   return chat(app, input, options)["text"]
 }
 
+/**
+  Stream a chat interaction with the application, sending user input and receiving partial responses via a callback.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - input: The user input message(s) to be processed.
+  - on_chunk: A callback function to handle partial response chunks.
+  - options: An optional object containing additional options for the chat, such as retrieval limits and streaming callbacks.
+
+  Returns:
+  - An object representing the final chat response, including the generated text, retrieval context, and usage information.
+  
+  Example:
+
+  ```sesi
+  fn on_chunk(chunk) { show chunk }
+  let response = stream("Hello, how are you?", my_app, on_chunk, {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "text": "I'm doing well, thank you!",
+    "retrieval": [...],
+    "usage": {...}
+  }
+  ```
+*/
 export fn stream(app: object, input, on_chunk, options: object = null) -> object {
   let stream_options = Utils.copy_object(options)
   stream_options["stream"] = on_chunk
   return chat(app, input, stream_options)
 }
 
+/**
+  Generate structured output from the application based on a prompt and a schema.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - prompt_text: The prompt text to be processed.
+  - schema: The schema defining the expected structure of the output.
+  - options: An optional object containing additional options for the structured generation.
+
+  Returns:
+  - The generated structured output according to the provided schema.
+
+  Example:
+
+  ```sesi
+  let result = structured("Extract the name and age from the text.", my_app, my_schema, {"temperature": 0})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "name": "John Doe",
+    "age": 30
+  }
+  ```
+*/
 export fn structured(app: object, prompt_text: string, schema, options: object = null) {
   let span = Observe.start_span(app["observer"], "structured.generate", {})
   try {
@@ -136,6 +292,32 @@ export fn structured(app: object, prompt_text: string, schema, options: object =
   return null
 }
 
+/**
+  Retrieve relevant information from the application's memory based on a query.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - query: The query string to search for in the memory.
+  - options: An optional object containing additional options for the retrieval.
+
+  Returns:
+  - An object containing the recent and relevant memory entries, as well as the context.
+
+  Example:
+
+  ```sesi
+  let memory_result = retrieve(my_app, "What is the capital of France?", {"retrieval_limit": 5})
+  ```
+
+  Output:
+  ```sesi
+  {
+    "recent": [...],
+    "relevant": [...],
+    "context": "The capital of France is Paris."
+  }
+  ```
+*/
 export fn retrieve(app: object, query: string, options: object = null) -> object {
   if app["memory"] == null {
     return {"recent": [], "relevant": [], "context": ""}
@@ -143,6 +325,29 @@ export fn retrieve(app: object, query: string, options: object = null) -> object
   return Memory.retrieve(app["memory"], query, options)
 }
 
+/**
+  Index a list of documents into the application's memory, splitting them into chunks as needed.
+
+  Parameters:
+  - app: The application object containing configuration, provider, memory, and observer.
+  - documents: An array of documents to be indexed.
+  - options: An optional object containing additional options for the indexing, such as chunking parameters.
+
+  Returns:
+  - The number of chunks successfully indexed into memory.
+
+  Example:
+
+  ```sesi
+  let documents = [document("Paris is the capital of France.", {"source": "encyclopedia"})]
+  let indexed_count = index_documents(documents, my_app, {"chunk_size": 100})
+  ```
+
+  Output:
+  ```sesi
+  1
+  ```
+*/
 export fn index_documents(app: object, documents: array, options: object = null) -> number {
   if app["memory"] == null { raise_error("MemoryError", "Application memory is disabled", null) }
   let count = 0

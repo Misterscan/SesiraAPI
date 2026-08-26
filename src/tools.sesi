@@ -2,6 +2,32 @@
 allow "utils" in as Utils
 allow "schema" in as Schema
 
+/**
+  Define a new tool with a name, description, parameters, and a handler function.
+
+  Parameters:
+  - name: The name of the tool.
+  - description: A brief description of the tool's functionality.
+  - parameters: The JSON Schema describing the tool's input parameters.
+  - handler: The function that implements the tool's behavior.
+
+  Returns:
+  - An object representing the defined tool.
+
+  Example:
+  ```sesi
+  fn greet(args) {
+    return "Hello, " + args["name"]
+  }
+  
+  let my_tool = define("greet", "Greet a user", {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, greet)
+  ```
+
+  Output:
+  ```sesi
+  {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ```
+*/
 export fn define(name: string, description: string, parameters, handler) -> object {
   Utils.assert_non_empty(name, "tool name")
   // Sesi exposes function values through the general object runtime type.
@@ -16,6 +42,29 @@ export fn define(name: string, description: string, parameters, handler) -> obje
   }
 }
 
+/**
+  Generate the JSON Schemas for a list of tools, optionally formatted for a specific provider.
+
+  Parameters:
+  - tools: An array of tool definitions.
+  - provider_name: The name of the provider for which to format the schemas (default: "gemini").
+
+  Returns:
+  - An array of JSON Schema declarations for the tools.
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ]
+  let schemas_output = schemas(tools, "openai")
+  ```
+
+  Output:
+  ```sesi
+  [{"type": "function", "function": {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}}}]
+  ```
+*/
 export fn schemas(tools: array, provider_name: string = "gemini") -> array {
   let declarations = []
   for item in tools {
@@ -35,6 +84,29 @@ export fn schemas(tools: array, provider_name: string = "gemini") -> array {
   return result
 }
 
+/**
+  Generate a human-readable description of a list of tools.
+
+  Parameters:
+  - tools: An array of tool definitions.
+
+  Returns:
+  - A string describing the tools and their arguments.
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ]
+  let description = describe(tools)
+  ```
+
+  Output:
+  ```sesi
+  '- greet: Greet a user
+    arguments: {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}'
+  ```
+*/
 export fn describe(tools: array) -> string {
   let output = ""
   for item in tools {
@@ -43,6 +115,29 @@ export fn describe(tools: array) -> string {
   return trim(output)
 }
 
+/**
+  Find a tool by its name.
+
+  Parameters:
+  - tools: An array of tool definitions.
+  - name: The name of the tool to find.
+
+  Returns:
+  - The tool object if found, otherwise null.
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ]
+  let tool = find_tool(tools, "greet")
+  ```
+
+  Output:
+  ```sesi
+  {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ```
+*/
 export fn find_tool(tools: array, name: string) {
   for item in tools {
     if item["name"] == name { return item }
@@ -50,6 +145,31 @@ export fn find_tool(tools: array, name: string) {
   return null
 }
 
+/**
+  Execute a tool call with the given arguments and context.
+
+  Parameters:
+  - tools: An array of tool definitions.
+  - call: An object representing the tool call, with "name" and "args" or "arguments".
+  - context: An optional context object to pass to the tool handler.
+
+  Returns:
+  - An object containing the execution result, including "ok", "tool", "result", "error", and "duration_ms".
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "parameters": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "handler": greet}
+  ]
+  let call = {"name": "greet", "args": {"name": "Alice"}}
+  let result = execute(tools, call)
+  ```
+
+  Output:
+  ```sesi
+  {"ok": true, "tool": "greet", "result": "Hello, Alice!", "duration_ms": 0}
+  ```
+*/
 export fn execute(tools: array, call: object, context: object = null) -> object {
   if context == null { context = {} }
   let name = call["name"]
@@ -73,6 +193,28 @@ export fn execute(tools: array, call: object, context: object = null) -> object 
   }
 }
 
+/**
+  Register native tools with the system.
+
+  Parameters:
+  - tools: An array of tool definitions, each containing "name", "handler", and "description".
+
+  Returns:
+  - An array of names of successfully registered tools.
+
+  Example:
+  ```sesi
+  let tools = [
+    {"name": "greet", "description": "Greet a user", "handler": greet}
+  ]
+  let registered = register_native(tools)
+  ```
+
+  Output:
+  ```sesi
+  ["greet"]
+  ```
+*/
 export fn register_native(tools: array) -> array {
   let registered = []
   for item in tools {
