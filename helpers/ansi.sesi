@@ -1,0 +1,168 @@
+/**
+  Terminal Formatting Convenience Wrappers
+  ========================================
+
+  Provides clean, semantic helpers for ANSI terminal output,
+  styled logs, banners, and notices using std/terminal.
+
+ Features:
+  - Semantic log wrappers (success, error, warning, info)
+  - Dynamic headers with automated borders
+  - Framed box notices for important alerts
+*/
+
+allow "std/terminal" in as Term
+
+// Remove the current line in the terminal.
+export fn rm_line() {
+  Term.clear("line")
+}
+
+// Clear the entire terminal screen.
+export fn reset() {
+  Term.clear("screen")
+}
+
+/**
+  Print a success message with green bold formatting.
+  
+ Output:
+  ✔ `msg` (in green bold)
+*/
+export fn success(msg: string) {
+  let text = "✔ " + msg
+  show text | Term.color("green") | Term.style("bold")
+}
+
+/**
+  Print an error message with red bold formatting.
+
+ Output:
+  ✖ `msg` (in red bold)
+*/
+export fn error(msg: string) {
+  let text = "✖ " + msg
+  show text | Term.color("red") | Term.style("bold")
+}
+
+/**
+  Print a warning message with yellow formatting.
+
+ Output:
+  ⚠️ `msg` (in yellow)
+*/
+export fn warning(msg: string) {
+  let text = "⚠️ " + msg
+  show text | Term.color("yellow")
+}
+
+/**
+  Print an informational message with cyan formatting.
+
+ Output:
+  ℹ️  `msg` (in cyan)
+*/
+export fn info(msg: string) {
+  let text = "ℹ️  " + msg
+  show text | Term.color("cyan")
+}
+
+/**
+  Print a styled section header with top and bottom divider bars.
+  
+ Output:
+
+  ════════════════════════════════════════════════
+
+  `title`
+  
+  ════════════════════════════════════════════════
+*/
+export fn header(title: string) {
+  Term.clear()
+  // Define the top and bottom divider bars for the header.
+  let bar = "════════════════════════════════════════════════"
+  show bar | Term.color("brightBlue")
+  show "  " + title | Term.color("brightWhite") | Term.style("bold")
+  show bar | Term.color("brightBlue")
+}
+
+/**
+  Print a framed message box for highlights or callouts.
+
+ Output:
+ 
+  ┌─────────────┐
+
+  │  `msg`      │
+
+  └─────────────┘
+*/
+export fn box(msg: string) {
+  let padding = 2
+  let innerWidth = len(msg) + padding * 2
+  let spaces = repeat(" ", padding)
+  let border = "┌" + repeat("─", innerWidth) + "┐"
+  let bottom = "└" + repeat("─", innerWidth) + "┘"
+  show border | Term.color("magenta")
+  show "│" + spaces + msg + spaces + "│" | Term.color("brightMagenta")
+  show bottom | Term.color("magenta")
+}
+
+/**
+  Print a styled inline badge with a customized label color.
+
+ Output:
+
+  `[label]` `msg` (with `label` in the specified color and bold)
+*/
+export fn badge(label: string, msg: string, colorName: string = "blue") {
+  // Display the label in the specified color and bold style.
+  prompt labelPrompt {"["label"]"}
+  show labelPrompt | Term.color(colorName) | Term.style("bold")
+  show msg
+}
+
+/**
+  Print a structured key-value pair with dim styling on the key.
+
+ Output:
+
+  `key`: `val` (with `key` in dim gray and `val` in white)
+*/
+export fn key_value(key: string, val: string) {
+  // Display the key in dim gray and the value in white.
+  prompt keyPrompt {key":"}
+  show keyPrompt | Term.color("gray") | Term.style("dim")
+  show val | Term.color("white")
+}
+
+/**
+  Print a custom repeatable divider line.
+
+ Output:
+
+  A line consisting of the specified `char` repeated `count` times (in bright black).
+*/
+export fn divider(char: string = "─", count: number = 46) {
+  // Construct the divider line by repeating the specified character.
+  let line = repeat(char, count)
+  show line | Term.color("brightBlack")
+}
+
+/**
+  Print a formatted row for lightweight CLI tables.
+
+ Output:
+
+  A row with each column separated by `│` and colored in cyan.
+*/
+export fn table_row(cols: array) {
+  // Construct and display a table row with each column padded and separated by `│`.
+  let paddedCols = []
+  for col in cols {
+    push(paddedCols, " " + str(col) + " ")
+  }
+  let rowStr = join(paddedCols, "│")
+  show "│" + rowStr + "│" | Term.color("cyan")
+}

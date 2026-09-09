@@ -1,5 +1,6 @@
 /* Mix deterministic Sesi steps with model-powered workflow steps. */
 allow "../index" in as Sesira
+allow "helpers/ansi" in as TERM
 
 fn normalize_topic(value, _state) {
   return trim(to_lower(value))
@@ -17,4 +18,6 @@ let steps = [
 ]
 
 let result = "  AI-powered garden planner  " | Sesira.run_workflow(steps)
-show result.final
+let header = result.final.brief | split("##")
+TERM.header(header[0] | swap("#", "") | trim)
+TERM.info(header | join("\n") | swap(header[0], "") | trim)

@@ -1,5 +1,6 @@
 /* Autonomous agent with validated native Sesi tools. */
 allow "../index" in as Sesira
+allow "helpers/ansi" in as TERM
 
 fn calculate(args, _context) {
   let left = args["left"]
@@ -23,4 +24,4 @@ let calculator = Sesira.tool("calculator", "Add or multiply two numbers", {
 let app = {"provider": "gemini", "model": "gemini-3.5-flash-lite"} | Sesira.create
 let agent = Sesira.create_agent(app, {"name": "math-agent", "tools": [calculator], "max_steps": 5})
 let result = "Multiply 17 by 23, then explain the result briefly." | Sesira.run_agent(agent)
-show result.answer
+TERM.box(result.answer)

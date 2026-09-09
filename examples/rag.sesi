@@ -1,5 +1,6 @@
 /* Index documents into durable memory and retrieve them during chat. */
 allow "../index" in as Sesira
+allow "helpers/ansi" in as TERM
 
 let app = {
   "provider": "gemini",
@@ -14,5 +15,5 @@ let documents = [
 ]
 
 let count = documents | Sesira.index_documents(app, {"size": 500, "overlap": 50})
-show "Indexed chunks:" count
-show "Can I refund a digital download I already opened?" | Sesira.ask(app)
+TERM.info("Indexed chunks: " + count)
+TERM.box("Can I refund a digital download I already opened?" | Sesira.ask(app))
