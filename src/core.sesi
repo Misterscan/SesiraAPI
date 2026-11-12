@@ -149,7 +149,7 @@ fn image_paths(messages: array) -> array {
   }
   ```
 */
-export fn chat(app: object, input, options: object = null) -> object {
+export fn chat(app: object, input, options: object = null) -> object | any {
   let messages = Messages.normalize(input)
   let question = last_user_text(messages)
   let span = Observe.start_span(app["observer"], "chat", {"message_count": len(messages)})
@@ -268,7 +268,7 @@ export fn stream(app: object, input, on_chunk, options: object = null) -> object
   Example:
 
   ```sesi
-  let result = structured("Extract the name and age from the text.", my_app, my_schema, {"temperature": 0})
+  let result = structured("Extract the name and age from the text.", my_app, my_schema)
   ```
 
   Output:

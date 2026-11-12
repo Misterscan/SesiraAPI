@@ -11,9 +11,8 @@ allow "utils" in as Utils
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
-    "system": "You are a helpful Sesi assistant.",
-    "temperature": 0.2,
+    "model": "gemini-3.8-flash",
+    "system": "You are a helpful Sesi assistant."
     "max_tokens": 4096,
     "thinking": "low",
     "search": false,
@@ -32,9 +31,8 @@ allow "utils" in as Utils
 export fn defaults() -> object {
   return {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "system": "You are a helpful Sesi assistant.",
-    "temperature": 0.2,
     "max_tokens": 4096,
     "thinking": "low",
     "search": false,
@@ -60,11 +58,10 @@ export fn defaults() -> object {
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
-    "log_path": ".sesira/events.jsonl",
-    "temperature": 0.2,
+    "log_path": ".sesira/events.jsonl"
     "max_tokens": 4096
   }
   ```
@@ -76,14 +73,12 @@ export fn from_env() -> object {
   let memory_path = env("SESIRA_MEMORY_PATH")
   let namespace = env("SESIRA_MEMORY_NAMESPACE")
   let log_path = env("SESIRA_LOG_PATH")
-  let temperature = env("SESIRA_TEMPERATURE")
   let max_tokens = env("SESIRA_MAX_TOKENS")
   if provider != null { result["provider"] = provider }
   if model_name != null { result["model"] = model_name }
   if memory_path != null { result["memory_path"] = memory_path }
   if namespace != null { result["memory_namespace"] = namespace }
   if log_path != null { result["log_path"] = log_path }
-  if temperature != null { result["temperature"] = num(temperature) }
   if max_tokens != null { result["max_tokens"] = num(max_tokens) }
   return result
 }
@@ -106,11 +101,10 @@ export fn from_env() -> object {
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
     "log_path": ".sesira/events.jsonl",
-    "temperature": 0.2,
     "max_tokens": 4096
   }
   ```
@@ -149,18 +143,17 @@ export fn read(path: string = "sesira.json") -> object {
 
   Example:
   ```sesi
-  let config = load("sesira.json", {"temperature": 0.5})
+  let config = load("sesira.json")
   ```
 
   Output:
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
-    "log_path": ".sesira/events.jsonl",
-    "temperature": 0.5,
+    "log_path": ".sesira/events.jsonl"
     "max_tokens": 4096
   }
   ```
@@ -192,9 +185,6 @@ export fn validate(config: object) -> object {
   if config["model"] == null || trim(str(config["model"])) == "" {
     raise_error("ConfigurationError", "model is required", null)
   }
-  if config["temperature"] < 0 || config["temperature"] > 2 {
-    raise_error("ConfigurationError", "temperature must be between 0 and 2", null)
-  }
   if config["max_tokens"] <= 0 {
     raise_error("ConfigurationError", "max_tokens must be positive", null)
   }
@@ -214,7 +204,7 @@ export fn validate(config: object) -> object {
   ```sesi
   let config = {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "api_key": "my_secret_api_key",
     "password": "my_secret_password"
   }
@@ -225,7 +215,7 @@ export fn validate(config: object) -> object {
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "api_key": "[redacted]",
     "password": "[redacted]"
   }

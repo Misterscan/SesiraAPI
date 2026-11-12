@@ -15,7 +15,6 @@ allow "observability" in as Observe
     - system: The system prompt for the agent (default is a careful Sesi agent description).
     - tools: An array of tools available to the agent (default is an empty array).
     - max_steps: The maximum number of steps the agent can take (default is from app config).
-    - temperature: The temperature for the agent's decision-making (default is 0.1).
 
   Returns:
   - An object representing the created agent with its configuration and resources.
@@ -33,8 +32,7 @@ allow "observability" in as Observe
     "app": my_app,
     "system": "You are an autonomous, careful Sesi agent. Use tools only when they help and finish with a direct answer.",
     "tools": [my_tool],
-    "max_steps": my_app["config"]["max_agent_steps"],
-    "temperature": 0.1
+    "max_steps": my_app["config"]["max_agent_steps"]
   }
   ```
 */
@@ -44,8 +42,7 @@ export fn create(app: object, options: object = null) -> object {
     "app": app,
     "system": Utils.pick(options, "system", "You are an autonomous, careful Sesi agent. Use tools only when they help and finish with a direct answer."),
     "tools": Utils.pick(options, "tools", []),
-    "max_steps": Utils.pick(options, "max_steps", app["config"]["max_agent_steps"]),
-    "temperature": Utils.pick(options, "temperature", 0.1)
+    "max_steps": Utils.pick(options, "max_steps", app["config"]["max_agent_steps"])
   }
 }
 
@@ -124,7 +121,6 @@ export fn run(agent: object, task: string, options: object = null) -> object {
     let decision = null
     try {
       decision = Schema.generate(app["provider"], prompt_text, step_schema(), {
-        "temperature": agent["temperature"],
         "stream": false,
         "system": agent["system"]
       })

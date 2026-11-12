@@ -10,7 +10,6 @@ allow "utils" in as Utils
     - `name`: The name of the provider. This is derived from the `kind` parameter and normalized to lowercase.
     - `model`: The model to be used by the provider. Defaults are set based on the `kind` of provider.
     - `system`: The system prompt or instructions for the provider.
-    - `temperature`: The sampling temperature for the model. Defaults to 0.2.
     - `max_tokens`: The maximum number of tokens to generate. Defaults to 4096.
     - `thinking`: The thinking level for the model. Defaults to "low".
     - `search`: Whether to enable search functionality. Defaults to `false`.
@@ -26,7 +25,6 @@ allow "utils" in as Utils
   ```sesi
   let config = provider("openai", {
     "system": "You are a helpful assistant.",
-    "temperature": 0.5,
     "max_tokens": 500,
     "thinking": "low",
     "search": false,
@@ -41,9 +39,8 @@ allow "utils" in as Utils
   ```sesi
   {
     "name": "openai",
-    "model": "gpt-5.6-terra",
+    "model": "gpt-6.1-terra",
     "system": "You are a helpful assistant.",
-    "temperature": 0.5,
     "max_tokens": 500,
     "thinking": "low",
     "search": false,
@@ -60,7 +57,6 @@ export fn provider(kind: string, options: object = null) -> object {
     "name": normalized,
     "model": "",
     "system": "",
-    "temperature": 0.3,
     "max_tokens": 4096,
     "thinking": "medium",
     "search": false,
@@ -69,8 +65,8 @@ export fn provider(kind: string, options: object = null) -> object {
     "images": [],
     "tools": []
   }
-  if normalized == "gemini" { base["model"] = "gemini-3.7-flash" }
-  if normalized == "openai" || normalized == "gpt" { base["model"] = "gpt-5.6-terra" }
+  if normalized == "gemini" { base["model"] = "gemini-3.8-flash" }
+  if normalized == "openai" || normalized == "gpt" { base["model"] = "gpt-6.1-terra" }
   if normalized == "local" { base["model"] = "local" }
   if normalized == "sesi" { base["model"] = "agent" }
   if normalized == "custom" { base["model"] = Utils.pick(options, "model", null) }
@@ -95,16 +91,15 @@ export fn provider(kind: string, options: object = null) -> object {
 
   Example:
   ```sesi
-  let config = from_config({"provider": "openai", "temperature": 0.5})
+  let config = from_config({"provider": "openai"})
   ```
 
   Output:
   ```sesi
   {
     "name": "openai",
-    "model": "gpt-5.6-terra",
+    "model": "gpt-6.1-terra",
     "system": "",
-    "temperature": 0.5,
     "max_tokens": 4096,
     "thinking": "medium",
     "search": false,
@@ -132,7 +127,7 @@ export fn from_config(config: object) -> object {
 
   Example:
   ```sesi
-  let config = from_config({"provider": "openai", "temperature": 0.5})
+  let config = from_config({"provider": "openai"})
   let result = complete(config, "Explain the concept of provider adapters.")
   ```
 
@@ -141,7 +136,7 @@ export fn from_config(config: object) -> object {
   {
     "id": "<generated_id>",
     "provider": "openai",
-    "model": "gpt-5.6-terra",
+    "model": "gpt-6.1-terra",
     "text": "Explain the concept of provider adapters.",
     "usage": {...},
     "duration_ms": <time_taken>
@@ -158,7 +153,7 @@ export fn complete(adapter: object, prompt_text: string, options: object = null)
   if settings["name"] == "openai" || settings["name"] == "gpt" {
     text = model(settings["model"]) {max_tokens: settings["max_tokens"], thinkingLevel: settings["thinking"], system: sys, search: settings["search"], cache: settings["cache"], stream: settings["stream"], images: settings["images"], tools: settings["tools"]} {prompt_text}
   } else {
-    text = model(settings["model"]) {temperature: settings["temperature"], max_tokens: settings["max_tokens"], thinkingLevel: settings["thinking"], system: sys, search: settings["search"], cache: settings["cache"], stream: settings["stream"], images: settings["images"], tools: settings["tools"]} {prompt_text}
+    text = model(settings["model"]) {max_tokens: settings["max_tokens"], thinkingLevel: settings["thinking"], system: sys, search: settings["search"], cache: settings["cache"], stream: settings["stream"], images: settings["images"], tools: settings["tools"]} {prompt_text}
   }
   let usage = model_usage()
   return {
@@ -186,7 +181,7 @@ export fn complete(adapter: object, prompt_text: string, options: object = null)
   Example:
   ```sesi
   fn on_chunk(chunk) {show chunk}
-  let config = from_config({"provider": "openai", "temperature": 0.5})
+  let config = from_config({"provider": "openai"})
   let result = stream(config, "Explain the concept of provider adapters.", on_chunk)
   ```
 
@@ -195,7 +190,7 @@ export fn complete(adapter: object, prompt_text: string, options: object = null)
   {
     "id": "<generated_id>",
     "provider": "openai",
-    "model": "gpt-5.6-terra",
+    "model": "gpt-6.1-terra",
     "text": "Explain the concept of provider adapters.",
     "usage": {...},
     "duration_ms": <time_taken>
@@ -217,8 +212,8 @@ export fn stream(adapter: object, prompt_text: string, on_chunk, options: object
   Output:
   ```sesi
   [
-    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.7-flash"},
-    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-5.6-terra"},
+    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.8-flash"},
+    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-6.1-terra"},
     {"name": "local", "key_env": null, "default_model": "local"},
     {"name": "sesi", "key_env": null, "default_model": "agent"},
     {"name": "custom", "key_env": "provider-specific", "default_model": null}
@@ -227,8 +222,8 @@ export fn stream(adapter: object, prompt_text: string, on_chunk, options: object
 */
 export fn supported() -> array {
   return [
-    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.7-flash"},
-    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-5.6-terra"},
+    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.8-flash"},
+    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-6.1-terra"},
     {"name": "local", "key_env": null, "default_model": "local"},
     {"name": "sesi", "key_env": null, "default_model": "agent"},
     {"name": "custom", "key_env": "provider-specific", "default_model": null}

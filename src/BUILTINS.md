@@ -2456,7 +2456,7 @@ Default behavior is automatic and requires no special syntax:
 
 Each step is an object with at minimum a `"prompt"` string. Optional keys include:
 
-- `"model"` (default: `"gemini-3.7-flash"`)
+- `"model"` (default: `"gemini-3.8-flash"`)
 - `"temperature"`, `"max_tokens"`, `"top_k"`, `"top_p"`
 - `"thinkingLevel"`, `"cache"`, `"search"`, `"system"`
 

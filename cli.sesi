@@ -37,7 +37,7 @@ fn write_if_missing(path: string, content: string, force: bool) -> bool {
 }
 
 fn init_project(force: bool) {
-  let config = "{\n  \"name\": \"my-sesira-app\",\n  \"provider\": \"gemini\",\n  \"model\": \"gemini-3.6-flash\",\n  \"system\": \"You are a helpful assistant.\",\n  \"temperature\": 0.2,\n  \"memory_path\": \".sesira/memory.db\",\n  \"observability\": true\n}\n"
+  let config = "{\n  \"name\": \"my-sesira-app\",\n  \"provider\": \"gemini\",\n  \"model\": \"gemini-3.6-flash\",\n  \"system\": \"You are a helpful assistant.\",\n  \"memory_path\": \".sesira/memory.db\",\n  \"observability\": true\n}\n"
   let app = "allow \"SesiraAPI\" in with Sesira\n\nlet app = {\"config_path\": \"sesira.json\"} | Sesira.create\nlet question = \"What can you help me build?\"\nlet answer = question | Sesira.ask(app)\nshow answer\n"
   show "Initializing a native Sesi AI application:"
   write_if_missing("sesira.json", config, force)

@@ -52,7 +52,6 @@ export fn create(config: object = null) -> object { return Core.create(config) }
     - `name`: The name of the provider. This is derived from the `kind` parameter and normalized to lowercase.
     - `model`: The model to be used by the provider. Defaults are set based on the `kind` of provider.
     - `system`: The system prompt or instructions for the provider.
-    - `temperature`: The sampling temperature for the model. Defaults to 0.2.
     - `max_tokens`: The maximum number of tokens to generate. Defaults to 4096.
     - `thinking`: The thinking level for the model. Defaults to "low".
     - `search`: Whether to enable search functionality. Defaults to `false`.
@@ -68,7 +67,6 @@ export fn create(config: object = null) -> object { return Core.create(config) }
   ```sesi
   let config = provider("openai", {
     "system": "You are a helpful assistant.",
-    "temperature": 0.5,
     "max_tokens": 500,
     "thinking": "low",
     "search": false,
@@ -83,9 +81,8 @@ export fn create(config: object = null) -> object { return Core.create(config) }
   ```sesi
   {
     "name": "openai",
-    "model": "gpt-5.6-terra",
+    "model": "gpt-6.1-terra",
     "system": "You are a helpful assistant.",
-    "temperature": 0.5,
     "max_tokens": 500,
     "thinking": "low",
     "search": false,
@@ -110,7 +107,7 @@ export fn provider(kind: string, options: object = null) -> object { return Prov
 
   Example:
   ```sesi
-  let config = from_config({"provider": "openai", "temperature": 0.5})
+  let config = from_config({"provider": "openai"})
   let result = complete(config, "Explain the concept of provider adapters.")
   ```
 
@@ -119,7 +116,7 @@ export fn provider(kind: string, options: object = null) -> object { return Prov
   {
     "id": "<generated_id>",
     "provider": "openai",
-    "model": "gpt-5.6-terra",
+    "model": "gpt-6.1-terra",
     "text": "Explain the concept of provider adapters.",
     "usage": {...},
     "duration_ms": <time_taken>
@@ -221,7 +218,7 @@ export fn stream(input, app: object, on_chunk, options: object = null) -> object
   Example:
 
   ```sesi
-  let result = structured("Extract the name and age from the text.", my_app, my_schema, {"temperature": 0})
+  let result = structured("Extract the name and age from the text.", my_app, my_schema)
   ```
 
   Output:
@@ -557,7 +554,6 @@ export fn register_tools(tools: array) -> array { return Tools.register_native(t
     - system: The system prompt for the agent (default is a careful Sesi agent description).
     - tools: An array of tools available to the agent (default is an empty array).
     - max_steps: The maximum number of steps the agent can take (default is from app config).
-    - temperature: The temperature for the agent's decision-making (default is 0.1).
 
   Returns:
   - An object representing the created agent with its configuration and resources.
@@ -575,8 +571,7 @@ export fn register_tools(tools: array) -> array { return Tools.register_native(t
     "app": my_app,
     "system": "You are an autonomous, careful Sesi agent. Use tools only when they help and finish with a direct answer.",
     "tools": [my_tool],
-    "max_steps": my_app["config"]["max_agent_steps"],
-    "temperature": 0.1
+    "max_steps": my_app["config"]["max_agent_steps"]
   }
   ```
 */
@@ -1267,18 +1262,17 @@ export fn metrics(observer: object) -> object { return Observe.metrics(observer)
 
   Example:
   ```sesi
-  let config = load_config("sesira.json", {"temperature": 0.5})
+  let config = load_config("sesira.json")
   ```
 
   Output:
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
     "log_path": ".sesira/events.jsonl",
-    "temperature": 0.5,
     "max_tokens": 4096
   }
   ```
@@ -1298,7 +1292,7 @@ export fn load_config(path: string = "sesira.json", overrides: object = null) ->
   ```sesi
   let config = {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "api_key": "my_secret_api_key",
     "password": "my_secret_password"
   }
@@ -1309,7 +1303,7 @@ export fn load_config(path: string = "sesira.json", overrides: object = null) ->
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.7-flash",
+    "model": "gemini-3.8-flash",
     "api_key": "[redacted]",
     "password": "[redacted]"
   }
@@ -1326,8 +1320,8 @@ export fn redact_config(config: object) -> object { return Config.redact(config)
   Output:
   ```sesi
   [
-    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.7-flash"},
-    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-5.6-terra"},
+    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.8-flash"},
+    {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-6.1-terra"},
     {"name": "local", "key_env": null, "default_model": "local"},
     {"name": "sesi", "key_env": null, "default_model": "agent"},
     {"name": "custom", "key_env": "provider-specific", "default_model": null}

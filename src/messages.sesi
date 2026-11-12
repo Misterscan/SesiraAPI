@@ -388,7 +388,7 @@ export fn template(text: string, values: object) -> string {
 
   Parameters:
   - messages: The array of messages to estimate tokens for.
-  - model_name: The name of the model to use for token estimation (default is "gemini-3.7-flash").
+  - model_name: The name of the model to use for token estimation (default is "gemini-3.8-flash").
 
   Returns:
   - The estimated number of tokens.
@@ -407,6 +407,6 @@ export fn template(text: string, values: object) -> string {
   10
   ```
 */
-export fn estimate(messages, model_name: string = "gemini-3.7-flash") -> number {
+export fn estimate(messages, model_name: string = "gemini-3.8-flash") -> number {
   return estimate_tokens(render(messages), model_name)
 }

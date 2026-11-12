@@ -90,14 +90,13 @@ Resolution order is: built-in defaults → `sesira.json` → environment → exp
   "provider": "gemini",
   "model": "gemini-3.6-flash",
   "system": "Answer from approved support knowledge.",
-  "temperature": 0.2,
   "memory_path": ".sesira/support.db",
   "memory_namespace": "support",
   "observability": true
 }
 ```
 
-Recognized environment overrides include `SESIRA_PROVIDER`, `SESIRA_MODEL`, `SESIRA_MEMORY_PATH`, `SESIRA_MEMORY_NAMESPACE`, `SESIRA_LOG_PATH`, `SESIRA_TEMPERATURE`, and `SESIRA_MAX_TOKENS`. Provider credentials continue to use Sesi’s normal `GEMINI_API_KEY` and `OPENAI_API_KEY` variables.
+Recognized environment overrides include `SESIRA_PROVIDER`, `SESIRA_MODEL`, `SESIRA_MEMORY_PATH`, `SESIRA_MEMORY_NAMESPACE`, `SESIRA_LOG_PATH`, and `SESIRA_MAX_TOKENS`. Provider credentials continue to use Sesi’s normal `GEMINI_API_KEY` and `OPENAI_API_KEY` variables.
 
 ## Streaming
 

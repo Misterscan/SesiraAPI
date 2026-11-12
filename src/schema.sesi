@@ -173,7 +173,7 @@ export fn parse(text: string, schema) {
 
   Example:
   ```sesi
-  let config = from_config({"provider": "openai", "temperature": 0.5})
+  let config = from_config({"provider": "openai")
   let value = generate(config, "Generate a person object", {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]})
   ```
 
@@ -190,7 +190,7 @@ export fn generate(adapter: object, prompt_text: string, schema, options: object
     return parse(response["text"], schema)
   } catch (first_error) {
     let repair = "Repair this response into valid JSON matching the schema. Return JSON only.\nSchema: " + schema_text + "\nResponse: " + response["text"]
-    let repaired = Providers.complete(adapter, repair, {"temperature": 0, "stream": false})
+    let repaired = Providers.complete(adapter, repair, {"stream": false})
     return parse(repaired["text"], schema)
   }
 }
