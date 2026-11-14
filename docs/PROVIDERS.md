@@ -4,7 +4,7 @@ Provider adapters normalize framework settings into Sesi’s native `model()` co
 
 | Adapter | Default | Credential |
 | --- | --- | --- |
-| `gemini` | `gemini-3.8-flash` | `GEMINI_API_KEY` |
+| `gemini` | `gemini-4-hydrogen` | `GEMINI_API_KEY` |
 | `openai` / `gpt` | `gpt-6.1-terra` | `OPENAI_API_KEY` |
 | `local` | `local` | none; follows Sesi local-model settings |
 | `sesi` | `agent` alias | depends on alias |

@@ -1269,7 +1269,7 @@ export fn metrics(observer: object) -> object { return Observe.metrics(observer)
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
     "log_path": ".sesira/events.jsonl",
@@ -1292,7 +1292,7 @@ export fn load_config(path: string = "sesira.json", overrides: object = null) ->
   ```sesi
   let config = {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "api_key": "my_secret_api_key",
     "password": "my_secret_password"
   }
@@ -1303,7 +1303,7 @@ export fn load_config(path: string = "sesira.json", overrides: object = null) ->
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "api_key": "[redacted]",
     "password": "[redacted]"
   }
@@ -1320,7 +1320,7 @@ export fn redact_config(config: object) -> object { return Config.redact(config)
   Output:
   ```sesi
   [
-    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-3.8-flash"},
+    {"name": "gemini", "key_env": "GEMINI_API_KEY", "default_model": "gemini-4-hydrogen"},
     {"name": "openai", "key_env": "OPENAI_API_KEY", "default_model": "gpt-6.1-terra"},
     {"name": "local", "key_env": null, "default_model": "local"},
     {"name": "sesi", "key_env": null, "default_model": "agent"},

@@ -11,7 +11,7 @@ allow "utils" in as Utils
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "system": "You are a helpful Sesi assistant."
     "max_tokens": 4096,
     "thinking": "low",
@@ -31,7 +31,7 @@ allow "utils" in as Utils
 export fn defaults() -> object {
   return {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "system": "You are a helpful Sesi assistant.",
     "max_tokens": 4096,
     "thinking": "low",
@@ -58,7 +58,7 @@ export fn defaults() -> object {
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
     "log_path": ".sesira/events.jsonl"
@@ -101,7 +101,7 @@ export fn from_env() -> object {
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
     "log_path": ".sesira/events.jsonl",
@@ -150,7 +150,7 @@ export fn read(path: string = "sesira.json") -> object {
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "memory_path": ".sesira/memory.db",
     "memory_namespace": "default",
     "log_path": ".sesira/events.jsonl"
@@ -204,7 +204,7 @@ export fn validate(config: object) -> object {
   ```sesi
   let config = {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "api_key": "my_secret_api_key",
     "password": "my_secret_password"
   }
@@ -215,7 +215,7 @@ export fn validate(config: object) -> object {
   ```sesi
   {
     "provider": "gemini",
-    "model": "gemini-3.8-flash",
+    "model": "gemini-4-hydrogen",
     "api_key": "[redacted]",
     "password": "[redacted]"
   }
